@@ -52,16 +52,6 @@
 		</repository>
 	</repositories>
 	
-	<dependencies>
-		<dependency>
-			<groupId>${server.groupId}</groupId>
-			<artifactId>${server.artifactId}</artifactId>
-			<version>${server.version}</version>
-			<classifier>${server.classifier}</classifier>
-			<type>zip</type>
-		</dependency>
-	</dependencies>
-	
 	<build>
 		<plugins>
 			<plugin>
@@ -73,10 +63,19 @@
 						<id>copy-server</id>
 						<phase>package</phase>
 						<goals>
-							<goal>copy-dependencies</goal>
+							<goal>copy</goal>
 						</goals>
 						<configuration>
 							<outputDirectory>${server.deployment.location}</outputDirectory>
+							<artifactItems>
+								<artifactItem>
+									<groupId>${server.groupId}</groupId>
+									<artifactId>${server.artifactId}</artifactId>
+									<version>${server.version}</version>
+									<classifier>${server.classifier}</classifier>
+									<type>zip</type>
+								</artifactItem>
+							</artifactItems>
 						</configuration>
 					</execution>
 				</executions>
