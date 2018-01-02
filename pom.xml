@@ -116,7 +116,7 @@
 								<argument>-f</argument>
 								<argument>${server.deployment.location}</argument>
 								<argument>-s</argument>
-								<argument>${server.deployment.location}/%{server.artifactId}-${server.version}-${server.classifier}.zip</argument>
+								<argument>${server.deployment.location}/${server.artifactId}-${server.version}-${server.classifier}.zip</argument>
 								<argument>-d</argument>
 								<argument>${dataset}</argument>
 								<argument>-c</argument>
