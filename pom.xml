@@ -113,12 +113,18 @@
 						<configuration>
 							<executable>${basedir}/test-jenkins-config.sh</executable>
 							<arguments>
-								<argument>-f ${server.deployment.location}</argument>
-								<argument>-s ${server.deployment.location}/%{server.artifactId}-${server.version}-${server.classifier}.zip</argument>
-								<argument>-d ${dataset}</argument>
-								<argument>-c ${config}</argument>
-								<argument>-u ${mysql.user}</argument>
-								<argument>-p ${mysql.pass}</argument>
+								<argument>-f</argument>
+								<argument>${server.deployment.location}</argument>
+								<argument>-s</argument>
+								<argument>${server.deployment.location}/%{server.artifactId}-${server.version}-${server.classifier}.zip</argument>
+								<argument>-d</argument>
+								<argument>${dataset}</argument>
+								<argument>-c</argument>
+								<argument>${config}</argument>
+								<argument>-u</argument>
+								<argument>${mysql.user}</argument>
+								<argument>-p</argument>
+								<argument>${mysql.pass}</argument>
 							</arguments>
 						</configuration>
 					</execution>
