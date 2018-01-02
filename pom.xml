@@ -86,7 +86,7 @@
 			    <version>1.7</version>
 			    <executions>
 			        <execution>
-			            <id>add-permissions</id>
+			            <id>set-permissions</id>
 			            <phase>package</phase>
 			            <configuration>
 			                <target>
