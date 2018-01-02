@@ -25,6 +25,7 @@
 		<config></config>
 		<mysql.user></mysql.user>
 		<mysql.pass></mysql.pass>
+		<server.archive.name>${server.artifactId}-${server.version}-${server.classifier}.zip</server.archive.name>
 	</properties>
 	
 	<repositories>
@@ -74,6 +75,8 @@
 									<version>${server.version}</version>
 									<classifier>${server.classifier}</classifier>
 									<type>zip</type>
+									<overWrite>true</overWrite>
+									<destFileName>${server.archive.name}</destFileName>
 								</artifactItem>
 							</artifactItems>
 						</configuration>
@@ -116,7 +119,7 @@
 								<argument>-f</argument>
 								<argument>${server.deployment.location}</argument>
 								<argument>-s</argument>
-								<argument>${server.deployment.location}/${server.artifactId}-${server.version}-${server.classifier}.zip</argument>
+								<argument>${server.deployment.location}/${server.archive.name}</argument>
 								<argument>-d</argument>
 								<argument>${dataset}</argument>
 								<argument>-c</argument>
