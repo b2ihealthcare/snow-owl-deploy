@@ -35,7 +35,7 @@ echo_step() {
 
 echo_exit() {
 	echo_error $@
-	exit 1
+	//exit 1
 }
 
 check_not_empty() {
@@ -71,7 +71,7 @@ check_variables() {
 	check_not_empty "$DATASET_ARCHIVE_PATH" "Dataset archive must be specified"
 	check_not_empty "$SNOWOWL_CONFIG_PATH" "Snow Owl config file path must be specified"
 	
-	check_if_folder_exists "$DEPLOYMENT_FOLDER" "Deployment folder does not exist"
+	check_if_folder_exists "$DEPLOYMENT_FOLDER" "Deployment folder does not exist at the specified path: '$DEPLOYMENT_FOLDER'"
 	check_if_file_exists "$SERVER_ARCHIVE_PATH" "Server archive does not exist at the specified path: '$SERVER_ARCHIVE_PATH'"
 	check_if_file_exists "$DATASET_ARCHIVE_PATH" "Dataset archive does not exist at the specified path: '$DATASET_ARCHIVE_PATH'"
 	check_if_file_exists "$SNOWOWL_CONFIG_PATH" "Snow Owl config file does not exist at the specified path: '$SNOWOWL_CONFIG_PATH'"
@@ -87,7 +87,7 @@ print_variables() {
 	
 	echo_date "MySQL user: $MYSQL_USERNAME"
 	echo_date "MySQL pass: $MYSQL_PASSWORD"
-	 
+	
 }
 
 main() {
@@ -95,9 +95,9 @@ main() {
 	echo_step "Snow Owl install script test started"
 	echo_date
 	
-    check_variables
-    
     print_variables
+    
+    check_variables
 
     echo_step "Snow Owl install script test finished"
     
