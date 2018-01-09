@@ -93,7 +93,7 @@
 			            <phase>package</phase>
 			            <configuration>
 			                <target>
-			                    <chmod file="${basedir}/test-jenkins-config.sh" perm="750"/>
+			                    <chmod file="${basedir}/deploy.sh" perm="750"/>
 			                </target>
 			            </configuration>
 			            <goals>
@@ -114,7 +114,7 @@
 							<goal>exec</goal>
 						</goals>
 						<configuration>
-							<executable>${basedir}/test-jenkins-config.sh</executable>
+							<executable>${basedir}/deploy.sh</executable>
 							<arguments>
 								<argument>-f</argument>
 								<argument>${server.deployment.location}</argument>
