@@ -41,10 +41,10 @@ MYSQL_USERNAME=""
 MYSQL_PASSWORD=""
 
 # Global path to server deployments
-GENERIC_SERVER_PATH="${DEPLOYMENT_FOLDER}/server"
+GENERIC_SERVER_PATH=""
 
 # Path to the latest server folder
-LATEST_SERVER_SYMLINK_PATH="${GENERIC_SERVER_PATH}/latest"
+LATEST_SERVER_SYMLINK_PATH=""
 
 # Variable to store the path of the newly installed server
 SERVER_PATH=""
@@ -59,13 +59,13 @@ RUNNING_SERVER_PATH=""
 EXISTING_SERVER_SHA1=""
 
 # Path to the sha1 value of the current server
-EXISTING_SERVER_SHA1_PATH="${DEPLOYMENT_FOLDER}/currentServer"
+EXISTING_SERVER_SHA1_PATH=""
 
 # SHA1 value of the incoming server
 INCOMING_SERVER_SHA1=""
 
 # Global path to resources: indexes, defaults, snomedicons
-GENERIC_RESOURCES_PATH="${DEPLOYMENT_FOLDER}/resources"
+GENERIC_RESOURCES_PATH=""
 
 # The containing folder of the dataset within the provided archive
 DATASET_PATH_WITHIN_ARCHIVE=""
@@ -74,13 +74,16 @@ DATASET_PATH_WITHIN_ARCHIVE=""
 EXISTING_DATASET_SHA1=""
 
 # Path to the sha1 value of the current dataset
-EXISTING_DATASET_SHA1_PATH="${DEPLOYMENT_FOLDER}/currentDataset"
+EXISTING_DATASET_SHA1_PATH=""
 
 # SHA1 value of the incoming dataset
 INCOMING_DATASET_SHA1=""
 
+# Flag to indicate if the dataset needs to reloaded regardless of the existing SHA1 value
+FORCE_RELOAD=false
+
 # Global path to logs
-GENERIC_LOG_PATH="${DEPLOYMENT_FOLDER}/logs"
+GENERIC_LOG_PATH=""
 
 # The number of retries to wait for e.g. server shutdown or log file creation
 RETRIES=15
@@ -100,7 +103,7 @@ SERVER_ANCHOR_FILE="snowowl_config.yml"
 
 # The anchor file in a dataset/server archive which is always in the root of the dataset folder.
 # This is used for identifying the dataset folder inside an archive with subfolders.
-DATASET_ANCHOR_FILE="snomedStore.sql"
+DATASET_ANCHOR_FILE="indexes"
 
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
@@ -165,7 +168,7 @@ echo_error() {
 }
 
 echo_date() {
-	echo -e "[$(date +\"%Y-%m-%d %H:%M:%S\")] $@"
+	echo -e "[`date +\"%Y-%m-%d %H:%M:%S\"`] $@"
 }
 
 echo_exit() {
@@ -195,8 +198,6 @@ execute_mysql_statement() {
 
 check_variables() {
 
-	echo_step "Validating script parameters"
-
 	check_not_empty "${MYSQL_USERNAME}" "MySQL username must be specified"
 	check_not_empty "${MYSQL_PASSWORD}" "MySQL password must be specified"
 	check_not_empty "${DEPLOYMENT_FOLDER}" "Deployment folder must be specified"
@@ -207,6 +208,8 @@ check_variables() {
 
 	if [ ! -z "${DATASET_ARCHIVE_PATH}" ]; then
 		check_if_file_exists "${DATASET_ARCHIVE_PATH}" "Dataset archive does not exist at the specified path: '${DATASET_ARCHIVE_PATH}'"
+	elif [ "${FORCE_RELOAD}" = true ]; then
+		echo_exit "Dataset archive must be specified if force reload is set"
 	fi
 
 	if [ ! -z "${SNOWOWL_CONFIG_PATH}" ]; then
@@ -216,6 +219,14 @@ check_variables() {
 	if [ ! -d "${DEPLOYMENT_FOLDER}" ]; then
 		mkdir "${DEPLOYMENT_FOLDER}"
 	fi
+
+	GENERIC_SERVER_PATH="${DEPLOYMENT_FOLDER}/server"
+	LATEST_SERVER_SYMLINK_PATH="${GENERIC_SERVER_PATH}/latest"
+	GENERIC_RESOURCES_PATH="${DEPLOYMENT_FOLDER}/resources"
+	GENERIC_LOG_PATH="${DEPLOYMENT_FOLDER}/logs"
+
+	EXISTING_SERVER_SHA1_PATH="${DEPLOYMENT_FOLDER}/currentServer"
+	EXISTING_DATASET_SHA1_PATH="${DEPLOYMENT_FOLDER}/currentDataset"
 
 	if [ ! -d "${GENERIC_SERVER_PATH}" ]; then
 		mkdir "${GENERIC_SERVER_PATH}"
@@ -321,6 +332,8 @@ shutdown_server() {
 
 check_server_sha() {
 
+	echo_step "Checking server SHA1 value"
+
 	# Cuts the filename from the sha1
 	INCOMING_SERVER_SHA1=$(sha1sum "${SERVER_ARCHIVE_PATH}" | sed -e 's/\s.*$//')
 
@@ -331,6 +344,7 @@ check_server_sha() {
 
 		if [ ! -z "${EXISTING_SERVER_SHA1}" ]; then
 			if [ "${INCOMING_SERVER_SHA1}" != "${EXISTING_SERVER_SHA1}" ]; then
+				echo_date "Differing server version found, the provided archive will be installed."
 				unzip_server
 			else
 
@@ -342,10 +356,12 @@ check_server_sha() {
 
 			fi
 		else
+			echo_date "SHA1 value is missing, the provided archive will be installed."
 			unzip_server
 		fi
 
 	else
+		echo_date "SHA1 value is missing, the provided archive will be installed."
 		unzip_server
 	fi
 }
@@ -408,7 +424,7 @@ unzip_server() {
 	SERVER_RESOURCES_PATH="${SERVER_PATH}/resources"
 
 	if [ -d "${SERVER_RESOURCES_PATH}" ]; then
-		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}"* && rm --recursive --force "${SERVER_RESOURCES_PATH}"
+		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}/"* && rm --recursive --force "${SERVER_RESOURCES_PATH}"
 	fi
 
 	ln -sf "${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}"
@@ -426,6 +442,8 @@ unzip_server() {
 
 check_dataset_sha() {
 
+	echo_step "Checking dataset SHA1 value"
+
 	# Cuts the filename from the sha1
 	INCOMING_DATASET_SHA1=$(sha1sum "${DATASET_ARCHIVE_PATH}" | sed -e 's/\s.*$//')
 
@@ -435,14 +453,17 @@ check_dataset_sha() {
 
 		if [ ! -z "${EXISTING_DATASET_SHA1}" ]; then
 			if [ "${INCOMING_DATASET_SHA1}" != "${EXISTING_DATASET_SHA1}" ]; then
+				echo_date "Differing dataset version found, the provided archive will be loaded."
 				unzip_and_load_dataset
 			else
 				echo_date "The specified dataset is already loaded."
 			fi
 		else
+			echo_date "SHA1 value is missing, the provided archive will be loaded."
 			unzip_and_load_dataset
 		fi
 	else
+		echo_date "SHA1 value is missing, the provided archive will be loaded."
 		unzip_and_load_dataset
 	fi
 }
@@ -538,14 +559,16 @@ unzip_and_load_dataset() {
 
 setup_configuration() {
 
-	echo_step "Configuring Snow Owl"
+	if [ ! -z "${SERVER_PATH}" ]; then
+		echo_step "Configuring Snow Owl"
 
-	\cp --force --target-directory="${DEPLOYMENT_FOLDER}" "${SNOWOWL_CONFIG_PATH}"
+		\cp --force --target-directory="${DEPLOYMENT_FOLDER}" "${SNOWOWL_CONFIG_PATH}"
 
-	rm --force "$SERVER_PATH/snowowl_config.yml"
+		rm --force "$SERVER_PATH/snowowl_config.yml"
 
-	ln -sf "${DEPLOYMENT_FOLDER}/snowowl_config.yml" "${SERVER_PATH}/snowowl_config.yml"
-	echo_date "Snow Owl's config symlink points from '$SERVER_PATH/snowowl_config.yml' to '$DEPLOYMENT_FOLDER/config.yml'"
+		ln -sf "${DEPLOYMENT_FOLDER}/snowowl_config.yml" "${SERVER_PATH}/snowowl_config.yml"
+		echo_date "Snow Owl's config symlink points from '${SERVER_PATH}/snowowl_config.yml' to '${DEPLOYMENT_FOLDER}/config.yml'"
+	fi
 
 }
 
@@ -613,6 +636,8 @@ main() {
 
 	check_variables
 
+	scan_archives
+
 	find_running_snowowl_servers
 
 	shutdown_server
@@ -622,7 +647,13 @@ main() {
 	fi
 
 	if [ ! -z "$DATASET_ARCHIVE_PATH" ]; then
-		check_dataset_sha
+
+		if [ "${FORCE_RELOAD}" = true ]; then
+			unzip_and_load_dataset
+		else
+			check_dataset_sha
+		fi
+
 	fi
 
 	if [ ! -z "$SNOWOWL_CONFIG_PATH" ]; then
@@ -632,14 +663,14 @@ main() {
 	start_server
 
 	echo_date
-	echo_date "Snow owl install script FINISHED."
+	echo_date "Snow Owl install script FINISHED."
 
 	exit 0
 }
 
 trap cleanup EXIT
 
-while getopts ":hf:s:d:c:u:p:" opt; do
+while getopts ":hf:s:d:rc:u:p:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -653,6 +684,9 @@ while getopts ":hf:s:d:c:u:p:" opt; do
 		;;
 	d)
 		DATASET_ARCHIVE_PATH=$OPTARG
+		;;
+	r)
+		FORCE_RELOAD=true
 		;;
 	c)
 		SNOWOWL_CONFIG_PATH=$OPTARG
