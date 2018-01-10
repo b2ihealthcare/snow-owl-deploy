@@ -265,7 +265,7 @@ scan_archives() {
 
 	if [ ! -z "${DATASET_ARCHIVE_PATH}" ]; then
 
-		SNOMED_STORE_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $DATASET_ANCHOR_FILE | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
+		SNOMED_STORE_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $DATASET_ANCHOR_FILE/$ | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
 
 		if [ -z "${SNOMED_STORE_LOCATION}" ]; then
 			echo_exit "Unable to locate dataset within '${DATASET_ARCHIVE_PATH}'."
