@@ -670,7 +670,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":hf:s:d:rc:u:p:" opt; do
+while getopts ":hf:s:d:r:c:u:p:" opt; do
 	case "$opt" in
 	h)
 		usage
