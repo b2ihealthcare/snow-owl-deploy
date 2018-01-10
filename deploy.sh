@@ -540,7 +540,7 @@ unzip_and_load_dataset() {
 	echo "${INCOMING_DATASET_SHA1}" >"${EXISTING_DATASET_SHA1_PATH}"
 
 	rm --recursive --force "${GENERIC_RESOURCES_PATH}/indexes"
-	rm --recursive --force "${GENERIC_RESOURCES_PATH}/*.sql"
+	rm --recursive --force "${GENERIC_RESOURCES_PATH}"/*.sql
 
 	TMP_DATASET_DIR=$(mktemp -d --tmpdir="${DEPLOYMENT_FOLDER}")
 	unzip -q "${DATASET_ARCHIVE_PATH}" -d "${TMP_DATASET_DIR}"
