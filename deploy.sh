@@ -604,7 +604,7 @@ start_server() {
 
 		chmod +x $SERVER_PATH/bin/*.sh
 
-		nohup "${SERVER_PATH}/bin/startup.sh" & > /dev/null
+		nohup "${SERVER_PATH}/bin/startup.sh" &> /dev/null
 
 		verify_server_startup "${SERVER_PATH}"
 
