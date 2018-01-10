@@ -80,7 +80,7 @@ EXISTING_DATASET_SHA1_PATH=""
 INCOMING_DATASET_SHA1=""
 
 # Flag to indicate if the dataset needs to reloaded regardless of the existing SHA1 value
-FORCE_RELOAD=false
+FORCE_RELOAD="false"
 
 # Global path to logs
 GENERIC_LOG_PATH=""
@@ -208,7 +208,7 @@ check_variables() {
 
 	if [ ! -z "${DATASET_ARCHIVE_PATH}" ]; then
 		check_if_file_exists "${DATASET_ARCHIVE_PATH}" "Dataset archive does not exist at the specified path: '${DATASET_ARCHIVE_PATH}'"
-	elif [ "${FORCE_RELOAD}" = true ]; then
+	elif [ "${FORCE_RELOAD}" = "true" ]; then
 		echo_exit "Dataset archive must be specified if force reload is set"
 	fi
 
@@ -648,7 +648,7 @@ main() {
 
 	if [ ! -z "$DATASET_ARCHIVE_PATH" ]; then
 
-		if [ "${FORCE_RELOAD}" = true ]; then
+		if [ "${FORCE_RELOAD}" = "true" ]; then
 			unzip_and_load_dataset
 		else
 			check_dataset_sha
@@ -686,7 +686,7 @@ while getopts ":hf:s:d:rc:u:p:" opt; do
 		DATASET_ARCHIVE_PATH=$OPTARG
 		;;
 	r)
-		FORCE_RELOAD=true
+		FORCE_RELOAD=$OPTARG
 		;;
 	c)
 		SNOWOWL_CONFIG_PATH=$OPTARG

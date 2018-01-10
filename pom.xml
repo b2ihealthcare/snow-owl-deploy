@@ -9,7 +9,17 @@
 	<packaging>pom</packaging>
 	
 	<properties>
-		<script.arguments></script.arguments>
+		<!-- the path on the target node where the server will be deployed -->
+		<server.deployment.location></server.deployment.location>
+		<!-- /path/to/server -->
+		<server.archive.path></server.archive.path>
+		<!-- /path/to/dataset -->
+		<dataset></dataset>
+		<!-- /path/to/server/config -->
+		<config></config>
+		<force.reload>false</force.reload>
+		<mysql.user></mysql.user>
+		<mysql.pass></mysql.pass>
 	</properties>
 	
 	<build>
@@ -46,7 +56,22 @@
 						</goals>
 						<configuration>
 							<executable>${basedir}/deploy.sh</executable>
-							<commandlineArgs>${script.arguments}</commandlineArgs>
+							<arguments>
+								<argument>-f</argument>
+								<argument>${server.deployment.location}</argument>
+								<argument>-s</argument>
+								<argument>${server.archive.path}</argument>
+								<argument>-d</argument>
+								<argument>${dataset}</argument>
+								<argument>-c</argument>
+								<argument>${config}</argument>
+								<argument>-r</argument>
+								<argument>${force.reload}</argument>
+								<argument>-u</argument>
+								<argument>${mysql.user}</argument>
+								<argument>-p</argument>
+								<argument>${mysql.pass}</argument>
+							</arguments>
 						</configuration>
 					</execution>
 				</executions>
