@@ -9,80 +9,11 @@
 	<packaging>pom</packaging>
 	
 	<properties>
-		<!-- the path on the target node where the server will be deployed -->
-		<server.deployment.location>/opt/snowowl</server.deployment.location>
-		<!-- the groupId of the server you would like to deploy -->
-		<server.groupId>com.b2international.snowowl</server.groupId>
-		<!-- the artifactId of the server you would like to deploy -->
-		<server.artifactId>com.b2international.snowowl.server.update</server.artifactId>
-		<!-- version of latest server to deploy -->
-		<server.version></server.version>
-		<!-- classifier selects either h2 or mysql configured Snow Owl server -->
-		<server.classifier>mysql</server.classifier>
-		<!-- /path/to/dataset -->
-		<dataset></dataset>
-		<!-- /path/to/server/config -->
-		<config></config>
-		<mysql.user></mysql.user>
-		<mysql.pass></mysql.pass>
-		<server.archive.name>${server.artifactId}-${server.version}-${server.classifier}.zip</server.archive.name>
+		<script.arguments></script.arguments>
 	</properties>
-	
-	<repositories>
-		<repository>
-			<id>nexus_releases</id>
-			<url>${nexus.releases.url}</url>
-			<releases>
-				<updatePolicy>always</updatePolicy>
-				<enabled>true</enabled>
-			</releases>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>nexus_snapshots</id>
-			<url>${nexus.snapshots.url}</url>
-			<snapshots>
-				<updatePolicy>always</updatePolicy>
-				<enabled>true</enabled>
-			</snapshots>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-		</repository>
-	</repositories>
 	
 	<build>
 		<plugins>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<version>2.10</version>
-				<executions>
-					<execution>
-						<id>copy-server</id>
-						<phase>package</phase>
-						<goals>
-							<goal>copy</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${server.deployment.location}</outputDirectory>
-							<artifactItems>
-								<artifactItem>
-									<groupId>${server.groupId}</groupId>
-									<artifactId>${server.artifactId}</artifactId>
-									<version>${server.version}</version>
-									<classifier>${server.classifier}</classifier>
-									<type>zip</type>
-									<overWrite>true</overWrite>
-									<destFileName>${server.archive.name}</destFileName>
-								</artifactItem>
-							</artifactItems>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
 			<plugin>
 			    <groupId>org.apache.maven.plugins</groupId>
 			    <artifactId>maven-antrun-plugin</artifactId>
@@ -115,20 +46,7 @@
 						</goals>
 						<configuration>
 							<executable>${basedir}/deploy.sh</executable>
-							<arguments>
-								<argument>-f</argument>
-								<argument>${server.deployment.location}</argument>
-								<argument>-s</argument>
-								<argument>${server.deployment.location}/${server.archive.name}</argument>
-								<argument>-d</argument>
-								<argument>${dataset}</argument>
-								<argument>-c</argument>
-								<argument>${config}</argument>
-								<argument>-u</argument>
-								<argument>${mysql.user}</argument>
-								<argument>-p</argument>
-								<argument>${mysql.pass}</argument>
-							</arguments>
+							<commandlineArgs>${script.arguments}</commandlineArgs>
 						</configuration>
 					</execution>
 				</executions>
