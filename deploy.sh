@@ -121,6 +121,8 @@ DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore localtermi
 # Enviromental variable used by Jenkins
 export BUILD_ID=dontKillMe
 
+export JAVA_HOME=/opt/jdk1.7.0_80
+
 usage() {
 
 	cat <<EOF
