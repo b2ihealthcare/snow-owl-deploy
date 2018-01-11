@@ -108,6 +108,12 @@ DATASET_ANCHOR_FILE="indexes"
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
 
+# The LDAP server's hostname
+LDAP_HOST=""
+
+# The LDAP password
+LDAP_PASSWORD="secret"
+
 # List of all known database names used by the Snow Owl terminology server
 DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore localterminologyStore
 	loincStore mappingsetStore opcsStore sddStore snomedStore umlsStore valuesetStore)
@@ -201,6 +207,7 @@ check_variables() {
 	check_not_empty "${MYSQL_USERNAME}" "MySQL username must be specified"
 	check_not_empty "${MYSQL_PASSWORD}" "MySQL password must be specified"
 	check_not_empty "${DEPLOYMENT_FOLDER}" "Deployment folder must be specified"
+	check_not_empty "${LDAP_HOST}" "LDAP host must be specified"
 
 	if [ ! -z "${SERVER_ARCHIVE_PATH}" ]; then
 		check_if_file_exists "${SERVER_ARCHIVE_PATH}" "Server archive does not exist at the specified path: '${SERVER_ARCHIVE_PATH}'"
@@ -438,6 +445,38 @@ unzip_server() {
 
 	echo_date "Latest server symlink points from: '${LATEST_SERVER_SYMLINK_PATH}' to '${SERVER_PATH}'"
 
+	configure_ldap_host
+
+}
+
+configure_ldap_host() {
+
+	JAAS_CONFIG_LOCATION=$(find $SERVER_PATH -type f ! -path '*.jar*' -name '*jaas_config*.conf')
+
+	# set LDAP url
+
+	OLD_VALUE=$(grep -Eo 'ldap://[^ ]+/' $JAAS_CONFIG_LOCATION)
+
+	LDAP_URL="ldap://${LDAP_HOST}:10389/"
+
+	sed -i 's,'"$OLD_VALUE"','"$LDAP_URL"',' $JAAS_CONFIG_LOCATION
+
+	echo_date "Setting LDAP host to '$LDAP_URL'"
+
+	# set LDAP password
+
+	if [ "$LDAP_PASSWORD" != "secret" ]; then
+
+		OLD_VALUE=$(grep -Eo 'bindDnPassword="[^ ]+"' $JAAS_CONFIG_LOCATION)
+
+		NEW_VALUE="bindDnPassword=\"$LDAP_PASSWORD\""
+
+		sed -i 's,'"$OLD_VALUE"','"$NEW_VALUE"',' $JAAS_CONFIG_LOCATION
+
+		echo_date "Setting LDAP password to '$LDAP_PASSWORD'"
+
+	fi
+
 }
 
 check_dataset_sha() {
@@ -670,7 +709,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":hf:s:d:r:c:u:p:" opt; do
+while getopts ":hf:s:d:r:c:u:p:l:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -696,6 +735,9 @@ while getopts ":hf:s:d:r:c:u:p:" opt; do
 		;;
 	p)
 		MYSQL_PASSWORD=$OPTARG
+		;;
+	l)
+		LDAP_HOST=$OPTARG
 		;;
 	\?)
 		echo_error "Invalid option: $OPTARG" >&2
