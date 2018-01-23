@@ -109,7 +109,7 @@ DATASET_ANCHOR_FILE="indexes"
 MYSQL=$(which mysql)
 
 # List of all known database names used by the Snow Owl terminology server
-DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore localterminologyStore
+DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
 	loincStore mappingsetStore opcsStore sddStore snomedStore umlsStore valuesetStore)
 
 # Enviromental variable used by Jenkins
