@@ -452,11 +452,15 @@ check_dataset_sha() {
 		EXISTING_DATASET_SHA1=$(<${EXISTING_DATASET_SHA1_PATH})
 
 		if [ ! -z "${EXISTING_DATASET_SHA1}" ]; then
-			if [ "${INCOMING_DATASET_SHA1}" != "${EXISTING_DATASET_SHA1}" ]; then
-				echo_date "Differing dataset version found, the provided archive will be loaded."
+			if [ "${FORCE_RELOAD}" = "true" ]; then
 				unzip_and_load_dataset
 			else
-				echo_date "The specified dataset is already loaded."
+				if [ "${INCOMING_DATASET_SHA1}" != "${EXISTING_DATASET_SHA1}" ]; then
+					echo_date "Differing dataset version found, the provided archive will be loaded."
+					unzip_and_load_dataset
+				else
+					echo_date "The specified dataset is already loaded."
+				fi
 			fi
 		else
 			echo_date "SHA1 value is missing, the provided archive will be loaded."
@@ -536,7 +540,6 @@ unzip_and_load_dataset() {
 
 	# Saving sha1 value of the new dataset
 	touch "${EXISTING_DATASET_SHA1_PATH}"
-
 	echo "${INCOMING_DATASET_SHA1}" >"${EXISTING_DATASET_SHA1_PATH}"
 
 	rm --recursive --force "${GENERIC_RESOURCES_PATH}/indexes"
@@ -647,13 +650,7 @@ main() {
 	fi
 
 	if [ ! -z "$DATASET_ARCHIVE_PATH" ]; then
-
-		if [ "${FORCE_RELOAD}" = "true" ]; then
-			unzip_and_load_dataset
-		else
-			check_dataset_sha
-		fi
-
+		check_dataset_sha
 	fi
 
 	if [ ! -z "$SNOWOWL_CONFIG_PATH" ]; then
