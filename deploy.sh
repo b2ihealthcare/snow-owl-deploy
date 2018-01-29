@@ -361,6 +361,8 @@ check_server_sha() {
 
 				if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
 					SERVER_PATH="${RUNNING_SERVER_PATH}"
+				elif [ -d "${LATEST_SERVER_SYMLINK_PATH}/bin" ]; then
+					SERVER_PATH="${LATEST_SERVER_SYMLINK_PATH}"
 				fi
 
 			fi
