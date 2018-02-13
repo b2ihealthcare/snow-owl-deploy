@@ -67,8 +67,11 @@ INCOMING_SERVER_SHA1=""
 # Global path to resources: indexes, defaults, snomedicons
 GENERIC_RESOURCES_PATH=""
 
-# The containing folder of the dataset within the provided archive
-DATASET_PATH_WITHIN_ARCHIVE=""
+# The containing folder of the indexes within the provided dataset archive
+INDEXES_FOLDER_WITHIN_ARCHIVE=""
+
+# The containing folder of the SQL files within the provided dataset archive
+SQL_FOLDER_WITHIN_ARCHIVE=""
 
 # SHA1 value of the existing dataset
 EXISTING_DATASET_SHA1=""
@@ -101,9 +104,13 @@ SNOWOWL_MYSQL_PASSWORD="snowowl"
 # used for identifying the server folder inside an archive with subfolders.
 SERVER_ANCHOR_FILE="snowowl_config.yml"
 
-# The anchor file in a dataset/server archive which is always in the root of the dataset folder.
-# This is used for identifying the dataset folder inside an archive with subfolders.
-DATASET_ANCHOR_FILE="indexes"
+# The indexes anchor folder in a dataset archive.
+# This is used for identifying the index folder inside an archive with subfolders.
+INDEXES_ANCHOR="indexes"
+
+# The anchor file for SQL files.
+# This is used for identifying the folder which contains the SQL files inside an archive with subfolders.
+SQL_ANCHOR="snomedStore.sql"
 
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
@@ -265,17 +272,34 @@ scan_archives() {
 
 	if [ ! -z "${DATASET_ARCHIVE_PATH}" ]; then
 
-		SNOMED_STORE_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $DATASET_ANCHOR_FILE/$ | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
+		INDEXES_FOLDER_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $INDEXES_ANCHOR/$ | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
 
-		if [ -z "${SNOMED_STORE_LOCATION}" ]; then
-			echo_exit "Unable to locate dataset within '${DATASET_ARCHIVE_PATH}'."
+		if [ -z "${INDEXES_FOLDER_LOCATION}" ]; then
+			echo_exit "Unable to locate indexes folder within '${DATASET_ARCHIVE_PATH}'"
 		else
-			DATASET_PATH_WITHIN_ARCHIVE=$(dirname "$SNOMED_STORE_LOCATION")
-			if [ "${DATASET_PATH_WITHIN_ARCHIVE}" = "." ]; then
-				echo_date "Found dataset in the root of '${DATASET_ARCHIVE_PATH}'"
-			else
-				echo_date "Found dataset within the provided archive: '${DATASET_ARCHIVE_PATH}/${DATASET_PATH_WITHIN_ARCHIVE}'"
+
+			INDEXES_FOLDER_WITHIN_ARCHIVE=${INDEXES_FOLDER_LOCATION%/}
+
+			if [ ! -z "${INDEXES_FOLDER_WITHIN_ARCHIVE}" ]; then
+				echo_date "Found indexes folder in: '${DATASET_ARCHIVE_PATH}/${INDEXES_FOLDER_WITHIN_ARCHIVE}'"
 			fi
+
+			SQL_FOLDER_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $SQL_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
+
+			if [ ! -z "${SQL_FOLDER_LOCATION}" ]; then
+
+				SQL_FOLDER_WITHIN_ARCHIVE=$(dirname "$SQL_FOLDER_LOCATION")
+
+				if [ "${SQL_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
+					echo_date "Found SQL files in the root of '${DATASET_ARCHIVE_PATH}'"
+				else
+					echo_date "Found SQL files in: '${DATASET_ARCHIVE_PATH}/${SQL_FOLDER_WITHIN_ARCHIVE}'"
+				fi
+
+			else
+				echo_date "No SQL files found in the provided dataset archive"
+			fi
+
 		fi
 
 	fi
@@ -547,13 +571,30 @@ unzip_and_load_dataset() {
 	rm --recursive --force "${GENERIC_RESOURCES_PATH}/indexes"
 	rm --recursive --force "${GENERIC_RESOURCES_PATH}"/*.sql
 
-	TMP_DATASET_DIR=$(mktemp -d --tmpdir="${DEPLOYMENT_FOLDER}")
-	unzip -q "${DATASET_ARCHIVE_PATH}" -d "${TMP_DATASET_DIR}"
+	mkdir "${GENERIC_RESOURCES_PATH}/indexes"
 
-	if [ "${DATASET_PATH_WITHIN_ARCHIVE}" = "." ]; then
-		mv -t "${GENERIC_RESOURCES_PATH}" "$TMP_DATASET_DIR/"*
-	else
-		mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/${DATASET_PATH_WITHIN_ARCHIVE}/"*
+	TMP_DATASET_DIR=$(mktemp -d --tmpdir="${DEPLOYMENT_FOLDER}")
+
+	if [ ! -z "${INDEXES_FOLDER_WITHIN_ARCHIVE}" ]; then
+
+		unzip -q "${DATASET_ARCHIVE_PATH}" "${INDEXES_FOLDER_WITHIN_ARCHIVE}/"* -d "${TMP_DATASET_DIR}"
+
+		if [ ! -z "$(ls -A ${TMP_DATASET_DIR}/${INDEXES_FOLDER_WITHIN_ARCHIVE})" ]; then
+			mv -t "${GENERIC_RESOURCES_PATH}/indexes" "${TMP_DATASET_DIR}/${INDEXES_FOLDER_WITHIN_ARCHIVE}/"*
+		fi
+
+	fi
+
+	if [ ! -z "${SQL_FOLDER_WITHIN_ARCHIVE}" ]; then
+
+		if [ "${SQL_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
+			unzip -q "${DATASET_ARCHIVE_PATH}" "*.sql" -d "${TMP_DATASET_DIR}"
+			mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/"*.sql
+		else
+			unzip -q "${DATASET_ARCHIVE_PATH}" "${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql -d "${TMP_DATASET_DIR}"
+			mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql
+		fi
+
 	fi
 
 	echo_date "Extracted dataset files to: '${GENERIC_RESOURCES_PATH}'"
