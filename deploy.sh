@@ -112,6 +112,9 @@ INDEXES_ANCHOR="indexes"
 # This is used for identifying the folder which contains the SQL files inside an archive with subfolders.
 SQL_ANCHOR="snomedStore.sql"
 
+# The anchor for identifying the H2 store folder inside a datatset archive
+H2_ANCHOR="snomedStore.h2.db"
+
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
 
@@ -288,7 +291,7 @@ scan_archives() {
 
 			if [ ! -z "${SQL_FOLDER_LOCATION}" ]; then
 
-				SQL_FOLDER_WITHIN_ARCHIVE=$(dirname "$SQL_FOLDER_LOCATION")
+				SQL_FOLDER_WITHIN_ARCHIVE=$(dirname "${SQL_FOLDER_LOCATION}")
 
 				if [ "${SQL_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
 					echo_date "Found SQL files in the root of '${DATASET_ARCHIVE_PATH}'"
@@ -298,6 +301,20 @@ scan_archives() {
 
 			else
 				echo_date "No SQL files found in the provided dataset archive"
+			fi
+			
+			H2_STORE_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $H2_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
+			
+			if [ ! -z "${H2_STORE_LOCATION}" ]; then
+
+				H2_FOLDER_WITHIN_ARCHIVE=$(dirname "${H2_STORE_LOCATION}")
+
+				if [ "${H2_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
+					echo_date "Found H2 files in the root of '${DATASET_ARCHIVE_PATH}'"
+				else
+					echo_date "Found H2 files in: '${DATASET_ARCHIVE_PATH}/${H2_FOLDER_WITHIN_ARCHIVE}'"
+				fi
+				
 			fi
 
 		fi
@@ -569,6 +586,7 @@ unzip_and_load_dataset() {
 	echo "${INCOMING_DATASET_SHA1}" >"${EXISTING_DATASET_SHA1_PATH}"
 
 	rm --recursive --force "${GENERIC_RESOURCES_PATH}/indexes"
+	rm --recursive --force "${GENERIC_RESOURCES_PATH}/store"
 	rm --recursive --force "${GENERIC_RESOURCES_PATH}"/*.sql
 
 	mkdir "${GENERIC_RESOURCES_PATH}/indexes"
@@ -583,6 +601,8 @@ unzip_and_load_dataset() {
 			mv -t "${GENERIC_RESOURCES_PATH}/indexes" "${TMP_DATASET_DIR}/${INDEXES_FOLDER_WITHIN_ARCHIVE}/"*
 		fi
 
+		echo_date "Extracted indexes folder to: '${GENERIC_RESOURCES_PATH}/indexes'"
+		
 	fi
 
 	if [ ! -z "${SQL_FOLDER_WITHIN_ARCHIVE}" ]; then
@@ -594,12 +614,29 @@ unzip_and_load_dataset() {
 			unzip -q "${DATASET_ARCHIVE_PATH}" "${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql -d "${TMP_DATASET_DIR}"
 			mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql
 		fi
+		
+		echo_date "Extracted SQL files to: '${GENERIC_RESOURCES_PATH}'"
 
 	fi
 
-	echo_date "Extracted dataset files to: '${GENERIC_RESOURCES_PATH}'"
-
-	setup_mysql_content
+	if [ ! -z "${H2_FOLDER_WITHIN_ARCHIVE}" ]; then
+	
+		if [ "${H2_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
+			unzip -q "${DATASET_ARCHIVE_PATH}" "*.db" -d "${TMP_DATASET_DIR}"
+			mv -t "${GENERIC_RESOURCES_PATH}/store" "${TMP_DATASET_DIR}/"*.db
+		else
+			unzip -q "${DATASET_ARCHIVE_PATH}" "${H2_FOLDER_WITHIN_ARCHIVE}/"*.db -d "${TMP_DATASET_DIR}"
+			mv -t "${GENERIC_RESOURCES_PATH}/store" "${TMP_DATASET_DIR}/${H2_FOLDER_WITHIN_ARCHIVE}/"*.db
+		fi
+		
+		echo_date "Extracted H2 database files to: '${GENERIC_RESOURCES_PATH}/store'"
+		
+	else
+	
+		# load MySQL content only when there is no H2 database in the dataset archive		
+		setup_mysql_content
+		
+	fi
 
 }
 
