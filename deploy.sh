@@ -89,7 +89,7 @@ FORCE_RELOAD="false"
 GENERIC_LOG_PATH=""
 
 # The number of retries to wait for e.g. server shutdown or log file creation
-RETRIES=15
+RETRIES=60
 
 # The number of seconds to wait between retries
 RETRY_WAIT_SECONDS=1
