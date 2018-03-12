@@ -89,7 +89,7 @@ FORCE_RELOAD="false"
 GENERIC_LOG_PATH=""
 
 # The number of retries to wait for e.g. server shutdown or log file creation
-RETRIES=60
+RETRIES=300
 
 # The number of seconds to wait between retries
 RETRY_WAIT_SECONDS=1
@@ -114,6 +114,15 @@ SQL_ANCHOR="snomedStore.sql"
 
 # The anchor for identifying the H2 store folder inside a datatset archive
 H2_ANCHOR="snomedStore.h2.db"
+
+# Path to the users file which could contain file based authentication info
+AUTHENTICATION_FILE_PATH=""
+
+# The base URL of the REST services to use
+BASE_URL="http://localhost:8080/snowowl"
+
+# The base URL for administrative services
+ADMIN_BASE_URL="$BASE_URL/admin"
 
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
@@ -204,6 +213,13 @@ check_if_file_exists() {
 
 execute_mysql_statement() {
 	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" >/dev/null 2>&1 && echo_date "$2"
+}
+
+# Invokes curl to make an HTTP request to the server; stores returned message and HTTP status code in output variables.
+rest_call() {
+	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_MYSQL_USER:$SNOWOWL_MYSQL_PASSWORD" --write-out "\n%{http_code}" "$@")
+	CURL_MESSAGE=$(echo "$CURL_OUTPUT" | head -n-1)
+	CURL_HTTP_STATUS=$(echo "$CURL_OUTPUT" | tail -n1)
 }
 
 check_variables() {
@@ -302,9 +318,9 @@ scan_archives() {
 			else
 				echo_date "No SQL files found in the provided dataset archive"
 			fi
-			
+
 			H2_STORE_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $H2_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
-			
+
 			if [ ! -z "${H2_STORE_LOCATION}" ]; then
 
 				H2_FOLDER_WITHIN_ARCHIVE=$(dirname "${H2_STORE_LOCATION}")
@@ -314,7 +330,7 @@ scan_archives() {
 				else
 					echo_date "Found H2 files in: '${DATASET_ARCHIVE_PATH}/${H2_FOLDER_WITHIN_ARCHIVE}'"
 				fi
-				
+
 			fi
 
 		fi
@@ -602,7 +618,7 @@ unzip_and_load_dataset() {
 		fi
 
 		echo_date "Extracted indexes folder to: '${GENERIC_RESOURCES_PATH}/indexes'"
-		
+
 	fi
 
 	if [ ! -z "${SQL_FOLDER_WITHIN_ARCHIVE}" ]; then
@@ -614,13 +630,13 @@ unzip_and_load_dataset() {
 			unzip -q "${DATASET_ARCHIVE_PATH}" "${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql -d "${TMP_DATASET_DIR}"
 			mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql
 		fi
-		
+
 		echo_date "Extracted SQL files to: '${GENERIC_RESOURCES_PATH}'"
 
 	fi
 
 	if [ ! -z "${H2_FOLDER_WITHIN_ARCHIVE}" ]; then
-	
+
 		if [ "${H2_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
 			unzip -q "${DATASET_ARCHIVE_PATH}" "*.db" -d "${TMP_DATASET_DIR}"
 			mv -t "${GENERIC_RESOURCES_PATH}/store" "${TMP_DATASET_DIR}/"*.db
@@ -628,14 +644,14 @@ unzip_and_load_dataset() {
 			unzip -q "${DATASET_ARCHIVE_PATH}" "${H2_FOLDER_WITHIN_ARCHIVE}/"*.db -d "${TMP_DATASET_DIR}"
 			mv -t "${GENERIC_RESOURCES_PATH}/store" "${TMP_DATASET_DIR}/${H2_FOLDER_WITHIN_ARCHIVE}/"*.db
 		fi
-		
+
 		echo_date "Extracted H2 database files to: '${GENERIC_RESOURCES_PATH}/store'"
-		
+
 	else
-	
-		# load MySQL content only when there is no H2 database in the dataset archive		
+
+		# load MySQL content only when there is no H2 database in the dataset archive
 		setup_mysql_content
-		
+
 	fi
 
 }
@@ -643,14 +659,28 @@ unzip_and_load_dataset() {
 setup_configuration() {
 
 	if [ ! -z "${SERVER_PATH}" ]; then
+
 		echo_step "Configuring Snow Owl"
 
-		\cp --force --target-directory="${DEPLOYMENT_FOLDER}" "${SNOWOWL_CONFIG_PATH}"
+		if [ ! -z "$SNOWOWL_CONFIG_PATH" ]; then
 
-		rm --force "$SERVER_PATH/snowowl_config.yml"
+			\cp --force --target-directory="${DEPLOYMENT_FOLDER}" "${SNOWOWL_CONFIG_PATH}"
 
-		ln -sf "${DEPLOYMENT_FOLDER}/snowowl_config.yml" "${SERVER_PATH}/snowowl_config.yml"
-		echo_date "Snow Owl's config symlink points from '${SERVER_PATH}/snowowl_config.yml' to '${DEPLOYMENT_FOLDER}/config.yml'"
+			rm --force "$SERVER_PATH/snowowl_config.yml"
+
+			ln -sf "${DEPLOYMENT_FOLDER}/snowowl_config.yml" "${SERVER_PATH}/snowowl_config.yml"
+			echo_date "Snow Owl's config symlink points from '${SERVER_PATH}/snowowl_config.yml' to '${DEPLOYMENT_FOLDER}/config.yml'"
+
+		fi
+
+		if [ ! -z "${AUTHENTICATION_FILE_PATH}" ]; then
+
+			\cp --force --target-directory="${SERVER_PATH}/configuration" "${AUTHENTICATION_FILE_PATH}"
+
+			echo_date "Configured file based authentication using '${AUTHENTICATION_FILE_PATH}'"
+
+		fi
+
 	fi
 
 }
@@ -666,12 +696,40 @@ verify_server_startup() {
 		if [ -z "${SERVER_TO_START}" ]; then
 			sleep "${RETRY_WAIT_SECONDS}"s
 		else
-			echo_date "Server started @ '${SERVER_TO_START}'"
+			echo_date "Starting up server @ '${SERVER_TO_START}'"
 			SERVER_IS_UP=true
 			break
 		fi
 
 	done
+
+	if [ "${SERVER_IS_UP}" = true ]; then
+
+		SERVER_IS_UP=false
+
+		for i in $(seq 1 "${RETRIES}"); do
+
+			rest_call "$ADMIN_BASE_URL/info"
+
+			if [ "${CURL_HTTP_STATUS}" != "200" ]; then
+				sleep "${RETRY_WAIT_SECONDS}"s
+			else
+
+				echo "${CURL_MESSAGE}" | grep -Po '"health":.*?[^\\]"' | sed 's/\"health\":\"\(.*\)\"/\1/' | while read -r REPOSITORY_HEALTH_STATE; do
+					if [ "${REPOSITORY_HEALTH_STATE}" = "RED" ]; then
+						echo_exit "One of the repositories returned RED health state. Check database consistency."
+					fi
+				done
+
+				echo_date "Server is up @ '${SERVER_TO_START}'"
+				SERVER_IS_UP=true
+				break
+
+			fi
+
+		done
+
+	fi
 
 	if [ "${SERVER_IS_UP}" = false ]; then
 		echo_exit "Unable to start server @ '$1' after $((${RETRIES} * ${RETRY_WAIT_SECONDS})) seconds"
@@ -733,9 +791,7 @@ main() {
 		check_dataset_sha
 	fi
 
-	if [ ! -z "$SNOWOWL_CONFIG_PATH" ]; then
-		setup_configuration
-	fi
+	setup_configuration
 
 	start_server
 
@@ -747,7 +803,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":hf:s:d:r:c:u:p:" opt; do
+while getopts ":hf:s:d:r:c:u:p:a:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -773,6 +829,9 @@ while getopts ":hf:s:d:r:c:u:p:" opt; do
 		;;
 	p)
 		MYSQL_PASSWORD=$OPTARG
+		;;
+	a)
+		AUTHENTICATION_FILE_PATH=$OPTARG
 		;;
 	\?)
 		echo_error "Invalid option: $OPTARG" >&2
