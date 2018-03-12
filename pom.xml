@@ -20,6 +20,7 @@
 		<force.reload>false</force.reload>
 		<mysql.user></mysql.user>
 		<mysql.pass></mysql.pass>
+		<authentication.file></authentication.file>
 		<ldap.host></ldap.host>
 	</properties>
 	
@@ -72,6 +73,8 @@
 								<argument>${mysql.user}</argument>
 								<argument>-p</argument>
 								<argument>${mysql.pass}</argument>
+								<argument>-a</argument>
+								<argument>${authentication.file}</argument>
 								<argument>-l</argument>
 								<argument>${ldap.host}</argument>
 							</arguments>
