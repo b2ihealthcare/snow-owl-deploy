@@ -15,6 +15,7 @@
 		<mysql.pass></mysql.pass>
 		<snowowl.user></snowowl.user>
 		<snowowl.pass></snowowl.pass>
+		<refresh.sha1></refresh.sha1>
 	</properties>
 	
 	<build>
@@ -64,6 +65,8 @@
 								<argument>${snowowl.user}</argument>
 								<argument>-j</argument>
 								<argument>${snowowl.pass}</argument>
+								<argument>-r</argument>
+								<argument>${refresh.sha1}</argument>
 							</arguments>
 						</configuration>
 					</execution>
