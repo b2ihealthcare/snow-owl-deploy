@@ -22,8 +22,14 @@
 # Version: 1.0
 #
 
+# The default deployment folder for Snow Owl terminology servers
+DEFAULT_DEPLOYMENT_FOLDER="/opt/snowowl"
+
+# The default location where dataset SHA1 sum is stored
+DEFAULT_DATASET_SHA1_LOCATION="${DEFAULT_DEPLOYMENT_FOLDER}/currentDataset"
+
 # The default deployment folder of the Snow Owl terminology server
-DEFAULT_SERVER_PATH="/opt/snowowl/server/latest"
+DEFAULT_SERVER_PATH="${DEFAULT_DEPLOYMENT_FOLDER}/server/latest"
 
 # The target path of the dataset backup archive
 TARGET_ARCHIVE_PATH=""
@@ -42,6 +48,9 @@ SNOWOWL_USER=""
 
 # The password for the Snow Owl user specified above
 SNOWOWL_USER_PASSWORD=""
+
+# If set the database SHA1 sum will be refreshed at the end of the backup process
+REFRESH_SHA1="false"
 
 # Variable used for storing the currently running Snow Owl server's path
 RUNNING_SERVER_PATH=""
@@ -94,20 +103,24 @@ OPTIONS:
 		Define the user for the Snow Owl terminology server which will be used for accessing information through the REST API
 	-j password
 		Define the password for the above Snow Owl user
+	-r true|false
+		If set to true the dataset SHA1 file will be updated after the backup process
 
 NOTES:
 
-	All of the above parameters are mandatory.
+	All of the above parameters are mandatory except '-r'.
 
 	If there is a running Snow Owl terminology server at the time of script execution, the following will happen:
 		- automatically locate the server
 		- shut it down gracefully
 		- create backup archive (including MySQL dumps in case of 'mysql')
+		- update dataset SHA1 file if required
 		- restart server and wait for full initialization
 
 	If there are no Snow Owl servers running at the time of script execution, the following will happen:
 		- use the configured default server path to locate the Snow Owl terminology server (E.g.: /opt/snowowl/server/latest )
 		- create backup archive (including MySQL dumps in case of 'mysql')
+		- update dataset SHA1 file if required
 
 	Examples:
 
@@ -115,7 +128,7 @@ NOTES:
 
 	OR
 
-	./backup.sh -t /path/to/desired/backup_archive.zip -d h2 -u username -p password -f username2 -j password2
+	./backup.sh -t /path/to/desired/backup_archive.zip -d h2 -u username -p password -f username2 -j password2 -r true
 
 EOF
 }
@@ -364,6 +377,37 @@ create_backup() {
 
 }
 
+update_dataset_sha1() {
+
+	if [ -f "${DEFAULT_DATASET_SHA1_LOCATION}" ]; then
+
+		INCOMING_DATASET_SHA1=$(sha1sum "${TARGET_ARCHIVE_PATH}" | sed -e 's/\s.*$//')
+		EXISTING_DATASET_SHA1=$(<${DEFAULT_DATASET_SHA1_LOCATION})
+
+		if [ ! -z "${EXISTING_DATASET_SHA1}" ]; then
+
+			if [ "${INCOMING_DATASET_SHA1}" != "${EXISTING_DATASET_SHA1}" ]; then
+
+				touch "${DEFAULT_DATASET_SHA1_LOCATION}"
+				echo "${INCOMING_DATASET_SHA1}" >"${DEFAULT_DATASET_SHA1_LOCATION}"
+
+				echo_date "Updated dataset SHA1 file @ '${DEFAULT_DATASET_SHA1_LOCATION}'"
+
+			fi
+
+		else
+
+			touch "${DEFAULT_DATASET_SHA1_LOCATION}"
+			echo "${INCOMING_DATASET_SHA1}" >"${DEFAULT_DATASET_SHA1_LOCATION}"
+
+			echo_date "Created dataset SHA1 file @ '${DEFAULT_DATASET_SHA1_LOCATION}'"
+
+		fi
+
+	fi
+
+}
+
 verify_server_startup() {
 
 	SERVER_IS_UP=false
@@ -467,6 +511,10 @@ main() {
 
 	create_backup
 
+	if [ "${REFRESH_SHA1}" = "true" ]; then
+		update_dataset_sha1
+	fi
+
 	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
 		restart_server
 	fi
@@ -480,7 +528,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":ht:d:u:p:f:j:" opt; do
+while getopts ":ht:d:u:p:f:j:r:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -503,6 +551,9 @@ while getopts ":ht:d:u:p:f:j:" opt; do
 		;;
 	j)
 		SNOWOWL_USER_PASSWORD=$OPTARG
+		;;
+	r)
+		REFRESH_SHA1=$OPTARG
 		;;
 	\?)
 		echo_error "Invalid option: $OPTARG" >&2
