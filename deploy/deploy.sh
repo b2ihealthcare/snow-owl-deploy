@@ -127,6 +127,9 @@ ADMIN_BASE_URL="$BASE_URL/admin"
 # The general info REST endpoint which also provides the list of available repositories
 INFO_URL="$ADMIN_BASE_URL/info"
 
+# The starting directory
+INITIAL_PWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
 
@@ -437,6 +440,12 @@ check_server_sha() {
 				elif [ -d "${LATEST_SERVER_SYMLINK_PATH}/bin" ]; then
 					SERVER_PATH="${LATEST_SERVER_SYMLINK_PATH}"
 				fi
+
+				# update access time of currently installed server dir to avoid deletion
+				cd "${LATEST_SERVER_SYMLINK_PATH}"
+				CURRENT_SERVER_DIR=$(pwd -P)
+				touch "${CURRENT_SERVER_DIR}"
+				cd "${INITIAL_PWD}"
 
 			fi
 		else
