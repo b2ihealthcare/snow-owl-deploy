@@ -16,7 +16,7 @@
 #
 
 #
-# Snow Owl terminology server install script
+# Snow Owl terminology server deploy script
 # See usage or execute the script with the -h flag to get further information.
 #
 # Version: 2.0
@@ -28,7 +28,7 @@ DEPLOYMENT_FOLDER="/opt/snowowl"
 # The server archive path that needs to be deployed
 SERVER_ARCHIVE_PATH=""
 
-# The dataset specifier for installing and configuring locally
+# The dataset archive path that needs to be deployed
 DATASET_ARCHIVE_PATH=""
 
 # The path to Snow Owl's config file to override the default
@@ -82,23 +82,23 @@ EXISTING_DATASET_SHA1_PATH=""
 # SHA1 value of the incoming dataset
 INCOMING_DATASET_SHA1=""
 
-# Flag to indicate if the dataset needs to reloaded regardless of the existing SHA1 value
+# Flag to indicate if the dataset needs to be reloaded regardless of the existing SHA1 value
 FORCE_RELOAD="false"
 
 # Global path to logs
 GENERIC_LOG_PATH=""
 
-# The number of retries to wait for e.g. server shutdown or log file creation
+# The number of retries to wait for e.g. server startup, shutdown or log file creation
 RETRIES=300
 
 # The number of seconds to wait between retries
 RETRY_WAIT_SECONDS=1
 
 # The default MySQL username for the Snow Owl terminology server
-SNOWOWL_MYSQL_USER="snowowl"
+SNOWOWL_MYSQL_USERNAME=""
 
 # The default MySQL password for the Snow Owl terminology server
-SNOWOWL_MYSQL_PASSWORD="snowowl"
+SNOWOWL_MYSQL_PASSWORD=""
 
 # The anchor file in a server archive which is always in the root of the server folder. This is
 # used for identifying the server folder inside an archive with subfolders.
@@ -115,7 +115,7 @@ SQL_ANCHOR="snomedStore.sql"
 # The anchor for identifying the H2 store folder inside a datatset archive
 H2_ANCHOR="snomedStore.h2.db"
 
-# Path to the users file which could contain file based authentication info
+# Path to the users file which contains file based authentication info
 AUTHENTICATION_FILE_PATH=""
 
 # The base URL of the REST services to use
@@ -123,6 +123,9 @@ BASE_URL="http://localhost:8080/snowowl"
 
 # The base URL for administrative services
 ADMIN_BASE_URL="$BASE_URL/admin"
+
+# The general info REST endpoint which also provides the list of available repositories
+INFO_URL="$ADMIN_BASE_URL/info"
 
 # Variable to determine the local MySQL instance
 MYSQL=$(which mysql)
@@ -139,39 +142,47 @@ usage() {
 	cat <<EOF
 NAME:
 
-    Snow Owl terminology server install script
+	Snow Owl terminology server deploy script
 
 OPTIONS:
+	-h
+		Show this help
+	-x path
+		Define the path of the deployment folder. Default is '/opt/snowowl'
+	-s path
+		Define the path of the server archive that needs to be deployed
+	-d path
+		Define the path of the dataset archive that needs to be loaded
+	-r true|false
+		If set to true the database is going to be reloaded regardless of the stored SHA1 value
+	-c path
+		Define the path to the snowowl_config.yml file which must be used for the deployment
+	-a path
+		Define the path to the file which contains users for file based authentication
+	-u username
+		Define a MySQL username with database creation privileges
+	-p password
+		Define the password for the above MySQL user
+	-f username
+		Define the MySQL user for the Snow Owl terminology server
+	-j password
+		Define the password for the above Snow Owl MySQL user
+
+NOTES:
+
 	This script can be used for deploying Snow Owl terminology server / dataset
 	in the following scenarios:
 		- clean install of a server with empty dataset
 		- clean install of a server with a provided dataset
 		- upgrading to a newer server version without modifying the existing dataset
 		- upgrading to a newer version of dataset without modifying the currently running server
-		- updating MySQL content from a provided dataset.
+		- updating MySQL content from a provided dataset
 
-NOTES:
-
-	Mandatory variables must be filled in before executing the script. These are:
-		- MySQL user with root privileges and it's password (to create the necessary
-		  SQL user/databases/tables)
-		- the desired MySQL user and password for the Snow Owl terminology server
-	Optional variables:
-		- path to deployment folder default is under /opt/snowowl
-
-    -f      (deployment folder): If set the snowowl server will be deployed under this folder (default /opt/snowowl/)
-
-    -s		(server path): If set the server will be extracted under the deployment folder
-
-    -d		(dataset path): If set the script will try load the dataset specified at the path
-
-    -c		(configuration path): If set the script will try to overwrite the existing configuration file
-
-    -h      (help): displays this help
-
-    -u      (mysql username): username for the mysql user on the server
-
-    -p      (mysql password): password for the mysql user on the server
+	Mandatory variables:
+		- MySQL user with database creation privileges
+		- MySQL password for the above user
+		- MySQL user for the Snow Owl terminology server
+		- MySQL password for the above user
 
 EOF
 
@@ -195,7 +206,7 @@ echo_exit() {
 	exit 1
 }
 
-check_not_empty() {
+check_if_empty() {
 
 	if [ -z "$1" ]; then
 		echo_exit "$2"
@@ -215,18 +226,19 @@ execute_mysql_statement() {
 	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" >/dev/null 2>&1 && echo_date "$2"
 }
 
-# Invokes curl to make an HTTP request to the server; stores returned message and HTTP status code in output variables.
 rest_call() {
-	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_MYSQL_USER:$SNOWOWL_MYSQL_PASSWORD" --write-out "\n%{http_code}" "$@")
+	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_MYSQL_USERNAME:$SNOWOWL_MYSQL_PASSWORD" --write-out "\n%{http_code}" "$@")
 	CURL_MESSAGE=$(echo "$CURL_OUTPUT" | head -n-1)
 	CURL_HTTP_STATUS=$(echo "$CURL_OUTPUT" | tail -n1)
 }
 
 check_variables() {
 
-	check_not_empty "${MYSQL_USERNAME}" "MySQL username must be specified"
-	check_not_empty "${MYSQL_PASSWORD}" "MySQL password must be specified"
-	check_not_empty "${DEPLOYMENT_FOLDER}" "Deployment folder must be specified"
+	check_if_empty "${MYSQL_USERNAME}" "MySQL username must be specified"
+	check_if_empty "${MYSQL_PASSWORD}" "MySQL password must be specified"
+	check_if_empty "${SNOWOWL_MYSQL_USERNAME}" "MySQL username for Snow Owl must be specified"
+	check_if_empty "${SNOWOWL_MYSQL_PASSWORD}" "MySQL password for Snow Owl must be specified"
+	check_if_empty "${DEPLOYMENT_FOLDER}" "Deployment folder must be specified"
 
 	if [ ! -z "${SERVER_ARCHIVE_PATH}" ]; then
 		check_if_file_exists "${SERVER_ARCHIVE_PATH}" "Server archive does not exist at the specified path: '${SERVER_ARCHIVE_PATH}'"
@@ -240,6 +252,10 @@ check_variables() {
 
 	if [ ! -z "${SNOWOWL_CONFIG_PATH}" ]; then
 		check_if_file_exists "${SNOWOWL_CONFIG_PATH}" "Snow Owl config file does not exist at the specified path: '${SNOWOWL_CONFIG_PATH}'"
+	fi
+
+	if [ ! -z "${AUTHENTICATION_FILE_PATH}" ]; then
+		check_if_file_exists "${AUTHENTICATION_FILE_PATH}" "File based authentication file does not exist at the specified path: '${AUTHENTICATION_FILE_PATH}'"
 	fi
 
 	if [ ! -d "${DEPLOYMENT_FOLDER}" ]; then
@@ -538,7 +554,7 @@ setup_mysql_content() {
 	SNOWOWL_USER_EXISTS=false
 
 	while read USER; do
-		if [[ "${SNOWOWL_MYSQL_USER}" == "${USER}" ]]; then
+		if [[ "${SNOWOWL_MYSQL_USERNAME}" == "${USER}" ]]; then
 			SNOWOWL_USER_EXISTS=true
 			break
 		fi
@@ -546,8 +562,8 @@ setup_mysql_content() {
 		--batch --skip-column-names --execute='use mysql; SELECT `user` FROM `user`;' >/dev/null 2>&1)
 
 	if [ "$SNOWOWL_USER_EXISTS" = false ]; then
-		execute_mysql_statement "CREATE USER '${SNOWOWL_MYSQL_USER}'@'localhost' identified by '${SNOWOWL_MYSQL_PASSWORD}';" \
-			"Created '${SNOWOWL_MYSQL_USER}' MySQL user with password '${SNOWOWL_MYSQL_PASSWORD}'."
+		execute_mysql_statement "CREATE USER '${SNOWOWL_MYSQL_USERNAME}'@'localhost' identified by '${SNOWOWL_MYSQL_PASSWORD}';" \
+			"Created '${SNOWOWL_MYSQL_USERNAME}' MySQL user with password '${SNOWOWL_MYSQL_PASSWORD}'."
 	fi
 
 	for i in "${DATABASES[@]}"; do
@@ -565,8 +581,8 @@ setup_mysql_content() {
 			DATABASE_NAME=${i}
 
 			execute_mysql_statement "CREATE DATABASE \`${DATABASE_NAME}\` DEFAULT CHARSET 'utf8';" "Created database ${DATABASE_NAME}."
-			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USER}'@'localhost';" \
-				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USER}@localhost'."
+			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'localhost';" \
+				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@localhost'."
 
 		done
 
@@ -578,8 +594,8 @@ setup_mysql_content() {
 			DATABASE_NAME=${BASENAME%.sql}
 
 			execute_mysql_statement "CREATE DATABASE \`${DATABASE_NAME}\` DEFAULT CHARSET 'utf8';" "Created database ${DATABASE_NAME}."
-			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USER}'@'localhost';" \
-				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USER}@localhost'."
+			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'localhost';" \
+				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@localhost'."
 
 			echo_date "Loading ${BASENAME}..."
 			${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} "${DATABASE_NAME}" <"${i}" >/dev/null 2>&1 &&
@@ -803,13 +819,13 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":hf:s:d:r:c:u:p:a:" opt; do
+while getopts ":hx:s:d:r:c:a:u:p:f:j:" opt; do
 	case "$opt" in
 	h)
 		usage
 		exit 0
 		;;
-	f)
+	x)
 		DEPLOYMENT_FOLDER=$OPTARG
 		;;
 	s)
@@ -824,14 +840,20 @@ while getopts ":hf:s:d:r:c:u:p:a:" opt; do
 	c)
 		SNOWOWL_CONFIG_PATH=$OPTARG
 		;;
+	a)
+		AUTHENTICATION_FILE_PATH=$OPTARG
+		;;
 	u)
 		MYSQL_USERNAME=$OPTARG
 		;;
 	p)
 		MYSQL_PASSWORD=$OPTARG
 		;;
-	a)
-		AUTHENTICATION_FILE_PATH=$OPTARG
+	f)
+		SNOWOWL_MYSQL_USERNAME=$OPTARG
+		;;
+	j)
+		SNOWOWL_MYSQL_PASSWORD=$OPTARG
 		;;
 	\?)
 		echo_error "Invalid option: $OPTARG" >&2
