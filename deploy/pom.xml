@@ -16,11 +16,13 @@
 		<!-- /path/to/dataset -->
 		<dataset></dataset>
 		<!-- /path/to/server/config -->
-		<config></config>
 		<force.reload>false</force.reload>
+		<config></config>
+		<authentication.file></authentication.file>
 		<mysql.user></mysql.user>
 		<mysql.pass></mysql.pass>
-		<authentication.file></authentication.file>
+		<snowowl.mysql.user></snowowl.mysql.user>
+		<snowowl.mysql.pass></snowowl.mysql.pass>
 	</properties>
 	
 	<build>
@@ -58,22 +60,26 @@
 						<configuration>
 							<executable>${basedir}/deploy.sh</executable>
 							<arguments>
-								<argument>-f</argument>
+								<argument>-x</argument>
 								<argument>${server.deployment.location}</argument>
 								<argument>-s</argument>
 								<argument>${server.archive.path}</argument>
 								<argument>-d</argument>
 								<argument>${dataset}</argument>
-								<argument>-c</argument>
-								<argument>${config}</argument>
 								<argument>-r</argument>
 								<argument>${force.reload}</argument>
+								<argument>-c</argument>
+								<argument>${config}</argument>
+								<argument>-a</argument>
+								<argument>${authentication.file}</argument>
 								<argument>-u</argument>
 								<argument>${mysql.user}</argument>
 								<argument>-p</argument>
 								<argument>${mysql.pass}</argument>
-								<argument>-a</argument>
-								<argument>${authentication.file}</argument>
+								<argument>-f</argument>
+								<argument>${snowowl.mysql.user}</argument>
+								<argument>-j</argument>
+								<argument>${snowowl.mysql.pass}</argument>
 							</arguments>
 						</configuration>
 					</execution>
