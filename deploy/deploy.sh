@@ -239,7 +239,7 @@ execute_mysql_statement() {
 }
 
 rest_call() {
-	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_MYSQL_USERNAME:$SNOWOWL_MYSQL_PASSWORD" --write-out "\n%{http_code}" "$@")
+	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_USERNAME:$SNOWOWL_USERNAME_PASSWORD" --write-out "\n%{http_code}" "$@")
 	CURL_MESSAGE=$(echo "$CURL_OUTPUT" | head -n-1)
 	CURL_HTTP_STATUS=$(echo "$CURL_OUTPUT" | tail -n1)
 }
