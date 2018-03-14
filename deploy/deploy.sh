@@ -95,10 +95,16 @@ RETRIES=300
 RETRY_WAIT_SECONDS=1
 
 # The default MySQL username for the Snow Owl terminology server
-SNOWOWL_MYSQL_USERNAME=""
+SNOWOWL_MYSQL_USERNAME="snowowl"
 
 # The default MySQL password for the Snow Owl terminology server
-SNOWOWL_MYSQL_PASSWORD=""
+SNOWOWL_MYSQL_PASSWORD="snowowl"
+
+# A valid Snow Owl user which could be used for authentication
+SNOWOWL_USERNAME=""
+
+# A valid Snow Owl user's password which could be used for authentication
+SNOWOWL_USERNAME_PASSWORD=""
 
 # The anchor file in a server archive which is always in the root of the server folder. This is
 # used for identifying the server folder inside an archive with subfolders.
@@ -115,17 +121,11 @@ SQL_ANCHOR="snomedStore.sql"
 # The anchor for identifying the H2 store folder inside a datatset archive
 H2_ANCHOR="snomedStore.h2.db"
 
-# Path to the users file which contains file based authentication info
-AUTHENTICATION_FILE_PATH=""
-
 # The base URL of the REST services to use
 BASE_URL="http://localhost:8080/snowowl"
 
 # The base URL for administrative services
 ADMIN_BASE_URL="$BASE_URL/admin"
-
-# The general info REST endpoint which also provides the list of available repositories
-INFO_URL="$ADMIN_BASE_URL/info"
 
 # The starting directory
 INITIAL_PWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -168,16 +168,16 @@ OPTIONS:
 		If set to true the database is going to be reloaded regardless of the stored SHA1 value
 	-c path
 		Define the path to the snowowl_config.yml file which must be used for the deployment
-	-a path
-		Define the path to the file which contains users for file based authentication
 	-u username
 		Define a MySQL username with database creation privileges
 	-p password
 		Define the password for the above MySQL user
 	-f username
-		Define the MySQL user for the Snow Owl terminology server
+		Define a valid user for the Snow Owl terminology server
 	-j password
-		Define the password for the above Snow Owl MySQL user
+		Define the password for the above Snow Owl user
+	-l ldap_host
+		Define the hostname of the LDAP host
 
 NOTES:
 
@@ -194,6 +194,7 @@ NOTES:
 		- MySQL password for the above user
 		- MySQL user for the Snow Owl terminology server
 		- MySQL password for the above user
+		- LDAP hostname
 
 EOF
 
@@ -264,10 +265,6 @@ check_variables() {
 
 	if [ ! -z "${SNOWOWL_CONFIG_PATH}" ]; then
 		check_if_file_exists "${SNOWOWL_CONFIG_PATH}" "Snow Owl config file does not exist at the specified path: '${SNOWOWL_CONFIG_PATH}'"
-	fi
-
-	if [ ! -z "${AUTHENTICATION_FILE_PATH}" ]; then
-		check_if_file_exists "${AUTHENTICATION_FILE_PATH}" "File based authentication file does not exist at the specified path: '${AUTHENTICATION_FILE_PATH}'"
 	fi
 
 	if [ ! -d "${DEPLOYMENT_FOLDER}" ]; then
@@ -739,14 +736,6 @@ setup_configuration() {
 
 		fi
 
-		if [ ! -z "${AUTHENTICATION_FILE_PATH}" ]; then
-
-			\cp --force --target-directory="${SERVER_PATH}/configuration" "${AUTHENTICATION_FILE_PATH}"
-
-			echo_date "Configured file based authentication using '${AUTHENTICATION_FILE_PATH}'"
-
-		fi
-
 	fi
 
 }
@@ -775,17 +764,11 @@ verify_server_startup() {
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			rest_call "$ADMIN_BASE_URL/info"
+			rest_call "$ADMIN_BASE_URL/codesystems"
 
 			if [ "${CURL_HTTP_STATUS}" != "200" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
 			else
-
-				echo "${CURL_MESSAGE}" | grep -Po '"health":.*?[^\\]"' | sed 's/\"health\":\"\(.*\)\"/\1/' | while read -r REPOSITORY_HEALTH_STATE; do
-					if [ "${REPOSITORY_HEALTH_STATE}" = "RED" ]; then
-						echo_exit "One of the repositories returned RED health state. Check database consistency."
-					fi
-				done
 
 				echo_date "Server is up @ '${SERVER_TO_START}'"
 				SERVER_IS_UP=true
@@ -869,7 +852,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":hx:s:d:r:c:a:u:p:f:j:l:" opt; do
+while getopts ":hx:s:d:r:c:u:p:f:j:l:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -890,9 +873,6 @@ while getopts ":hx:s:d:r:c:a:u:p:f:j:l:" opt; do
 	c)
 		SNOWOWL_CONFIG_PATH=$OPTARG
 		;;
-	a)
-		AUTHENTICATION_FILE_PATH=$OPTARG
-		;;
 	u)
 		MYSQL_USERNAME=$OPTARG
 		;;
@@ -900,10 +880,10 @@ while getopts ":hx:s:d:r:c:a:u:p:f:j:l:" opt; do
 		MYSQL_PASSWORD=$OPTARG
 		;;
 	f)
-		SNOWOWL_MYSQL_USERNAME=$OPTARG
+		SNOWOWL_USERNAME=$OPTARG
 		;;
 	j)
-		SNOWOWL_MYSQL_PASSWORD=$OPTARG
+		SNOWOWL_USERNAME_PASSWORD=$OPTARG
 		;;
 	l)
 		LDAP_HOST=$OPTARG

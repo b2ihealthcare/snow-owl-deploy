@@ -18,11 +18,10 @@
 		<!-- /path/to/server/config -->
 		<force.reload>false</force.reload>
 		<config></config>
-		<authentication.file></authentication.file>
 		<mysql.user></mysql.user>
 		<mysql.pass></mysql.pass>
-		<snowowl.mysql.user></snowowl.mysql.user>
-		<snowowl.mysql.pass></snowowl.mysql.pass>
+		<snowowl.user></snowowl.user>
+		<snowowl.pass></snowowl.pass>
 		<ldap.host></ldap.host>
 	</properties>
 	
@@ -71,16 +70,14 @@
 								<argument>${force.reload}</argument>
 								<argument>-c</argument>
 								<argument>${config}</argument>
-								<argument>-a</argument>
-								<argument>${authentication.file}</argument>
 								<argument>-u</argument>
 								<argument>${mysql.user}</argument>
 								<argument>-p</argument>
 								<argument>${mysql.pass}</argument>
 								<argument>-f</argument>
-								<argument>${snowowl.mysql.user}</argument>
+								<argument>${snowowl.user}</argument>
 								<argument>-j</argument>
-								<argument>${snowowl.mysql.pass}</argument>
+								<argument>${snowowl.pass}</argument>
 								<argument>-l</argument>
 								<argument>${ldap.host}</argument>
 							</arguments>
