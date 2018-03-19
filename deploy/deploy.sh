@@ -575,6 +575,7 @@ check_dataset_sha() {
 
 		if [ ! -z "${EXISTING_DATASET_SHA1}" ]; then
 			if [ "${FORCE_RELOAD}" = "true" ]; then
+				echo_date "Force reloading dataset."
 				unzip_and_load_dataset
 			else
 				if [ "${INCOMING_DATASET_SHA1}" != "${EXISTING_DATASET_SHA1}" ]; then
@@ -699,6 +700,8 @@ unzip_and_load_dataset() {
 	fi
 
 	if [ ! -z "${H2_FOLDER_WITHIN_ARCHIVE}" ]; then
+
+		mkdir "${GENERIC_RESOURCES_PATH}/store"
 
 		if [ "${H2_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
 			unzip -q "${DATASET_ARCHIVE_PATH}" "*.db" -d "${TMP_DATASET_DIR}"
