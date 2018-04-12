@@ -331,7 +331,7 @@ shutdown_server() {
 backup_repository() {
 	DATABASE_DUMP_FILE="$REPOSITORY.sql"
 	echo_date "Creating SQL dump from contents of repository $REPOSITORY to $DATABASE_DUMP_FILE..."
-	mysqldump --user="${MYSQL_USER}" --password="${MYSQL_USER_PASSWORD}" "${REPOSITORY}" >"${TMP_DATASET_DIR}/${DATABASE_DUMP_FILE}" 2>&1
+	mysqldump --user="${MYSQL_USER}" --password="${MYSQL_USER_PASSWORD}" --default-character-set=utf8 "${REPOSITORY}" --result-file="${TMP_DATASET_DIR}/${DATABASE_DUMP_FILE}" >/dev/null 2>&1
 }
 
 create_backup() {
