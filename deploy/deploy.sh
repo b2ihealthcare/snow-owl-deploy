@@ -55,13 +55,13 @@ SERVER_PATH_WITHIN_ARCHIVE=""
 # Variable used for storing the currently running Snow Owl server's path
 RUNNING_SERVER_PATH=""
 
-# SHA1 value of the existing server
+# SHA1 checksum of the existing server
 EXISTING_SERVER_SHA1=""
 
-# Path to the sha1 value of the current server
+# Path to the SHA1 checksum of the current server
 EXISTING_SERVER_SHA1_PATH=""
 
-# SHA1 value of the incoming server
+# SHA1 checksum of the incoming server
 INCOMING_SERVER_SHA1=""
 
 # Global path to resources: indexes, defaults, snomedicons
@@ -73,16 +73,16 @@ INDEXES_FOLDER_WITHIN_ARCHIVE=""
 # The containing folder of the SQL files within the provided dataset archive
 SQL_FOLDER_WITHIN_ARCHIVE=""
 
-# SHA1 value of the existing dataset
+# SHA1 checksum of the existing dataset
 EXISTING_DATASET_SHA1=""
 
-# Path to the sha1 value of the current dataset
+# Path to the SHA1 checksum of the current dataset
 EXISTING_DATASET_SHA1_PATH=""
 
-# SHA1 value of the incoming dataset
+# SHA1 checksum of the incoming dataset
 INCOMING_DATASET_SHA1=""
 
-# Flag to indicate if the dataset needs to be reloaded regardless of the existing SHA1 value
+# Flag to indicate if the dataset needs to be reloaded regardless of the existing SHA1 checksum
 FORCE_RELOAD="false"
 
 # Global path to logs
@@ -165,7 +165,7 @@ OPTIONS:
 	-d path
 		Define the path of the dataset archive that needs to be loaded
 	-r true|false
-		If set to true the database is going to be reloaded regardless of the stored SHA1 value
+		If set to true the database is going to be reloaded regardless of the stored SHA1 checksum
 	-c path
 		Define the path to the snowowl_config.yml file which must be used for the deployment
 	-u username
@@ -414,14 +414,14 @@ shutdown_server() {
 
 check_server_sha() {
 
-	echo_step "Checking server SHA1 value"
+	echo_step "Validating server SHA1 checksum"
 
 	# Cuts the filename from the sha1
 	INCOMING_SERVER_SHA1=$(sha1sum "${SERVER_ARCHIVE_PATH}" | sed -e 's/\s.*$//')
 
 	if [ -f "${EXISTING_SERVER_SHA1_PATH}" ]; then
 
-		# Reads the sha1 value from the file
+		# Reads the SHA1 checksum from the file
 		EXISTING_SERVER_SHA1=$(<${EXISTING_SERVER_SHA1_PATH})
 
 		if [ ! -z "${EXISTING_SERVER_SHA1}" ]; then
@@ -446,12 +446,12 @@ check_server_sha() {
 
 			fi
 		else
-			echo_date "SHA1 value is missing, the provided archive will be installed."
+			echo_date "SHA1 checksum is missing, the provided archive will be installed."
 			unzip_server
 		fi
 
 	else
-		echo_date "SHA1 value is missing, the provided archive will be installed."
+		echo_date "SHA1 checksum is missing, the provided archive will be installed."
 		unzip_server
 	fi
 }
@@ -463,7 +463,7 @@ unzip_server() {
 	# create server SHA1 file if not exists
 	touch "${EXISTING_SERVER_SHA1_PATH}"
 
-	# copy incoming SHA1 value into existing
+	# copy incoming SHA1 checksum into existing
 	echo "${INCOMING_SERVER_SHA1}" >"${EXISTING_SERVER_SHA1_PATH}"
 
 	TMP_SERVER_DIR=$(mktemp -d --tmpdir="${DEPLOYMENT_FOLDER}")
@@ -564,10 +564,16 @@ configure_ldap_host() {
 
 check_dataset_sha() {
 
-	echo_step "Checking dataset SHA1 value"
+	echo_step "Validating dataset SHA1 checksum"
 
-	# Cuts the filename from the sha1
-	INCOMING_DATASET_SHA1=$(sha1sum "${DATASET_ARCHIVE_PATH}" | sed -e 's/\s.*$//')
+	if [ -f "${DATASET_ARCHIVE_PATH}.sha1" ]; then
+		echo_date "Using checksum value stored in '${DATASET_ARCHIVE_PATH}.sha1'"
+	else
+		echo_date "Calculating SHA1 checksum..."
+		sha1sum "${DATASET_ARCHIVE_PATH}" >"${DATASET_ARCHIVE_PATH}.sha1" && echo_date "SHA1 checksum is @ '${TARGET_ARCHIVE_PATH}.sha1'"
+	fi
+
+	INCOMING_DATASET_SHA1=$(cat "${DATASET_ARCHIVE_PATH}.sha1" | sed -e 's/\s.*$//')
 
 	if [ -f "${EXISTING_DATASET_SHA1_PATH}" ]; then
 
@@ -586,11 +592,11 @@ check_dataset_sha() {
 				fi
 			fi
 		else
-			echo_date "SHA1 value is missing, the provided archive will be loaded."
+			echo_date "SHA1 checksum is missing, the provided archive will be loaded."
 			unzip_and_load_dataset
 		fi
 	else
-		echo_date "SHA1 value is missing, the provided archive will be loaded."
+		echo_date "SHA1 checksum is missing, the provided archive will be loaded."
 		unzip_and_load_dataset
 	fi
 }
@@ -661,7 +667,7 @@ unzip_and_load_dataset() {
 
 	echo_step "Unzipping dataset"
 
-	# Saving sha1 value of the new dataset
+	# Saving SHA1 checksum of the new dataset
 	touch "${EXISTING_DATASET_SHA1_PATH}"
 	echo "${INCOMING_DATASET_SHA1}" >"${EXISTING_DATASET_SHA1_PATH}"
 
