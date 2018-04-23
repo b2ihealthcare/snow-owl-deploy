@@ -570,7 +570,7 @@ check_dataset_sha() {
 		echo_date "Using checksum value stored in '${DATASET_ARCHIVE_PATH}.sha1'"
 	else
 		echo_date "Calculating SHA1 checksum..."
-		sha1sum "${DATASET_ARCHIVE_PATH}" >"${DATASET_ARCHIVE_PATH}.sha1" && echo_date "SHA1 checksum is @ '${TARGET_ARCHIVE_PATH}.sha1'"
+		sha1sum "${DATASET_ARCHIVE_PATH}" >"${DATASET_ARCHIVE_PATH}.sha1" && echo_date "SHA1 checksum is @ '${DATASET_ARCHIVE_PATH}.sha1'"
 	fi
 
 	INCOMING_DATASET_SHA1=$(cat "${DATASET_ARCHIVE_PATH}.sha1" | sed -e 's/\s.*$//')
