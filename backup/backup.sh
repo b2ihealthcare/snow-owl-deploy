@@ -375,6 +375,10 @@ create_backup() {
 
 	fi
 
+	if [ -f "${TARGET_ARCHIVE_PATH}" ]; then
+		sha1sum "${TARGET_ARCHIVE_PATH}" >"${TARGET_ARCHIVE_PATH}.sha1" && echo_date "SHA1 checksum is @ '${TARGET_ARCHIVE_PATH}.sha1'"
+	fi
+
 }
 
 update_dataset_sha1() {
