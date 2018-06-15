@@ -322,7 +322,7 @@ scan_archives() {
 				echo_date "Found indexes folder in: '${DATASET_ARCHIVE_PATH}/${INDEXES_FOLDER_WITHIN_ARCHIVE}'"
 			fi
 
-			SQL_FOLDER_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $SQL_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
+			SQL_FOLDER_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep -i $SQL_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
 
 			if [ ! -z "${SQL_FOLDER_LOCATION}" ]; then
 
