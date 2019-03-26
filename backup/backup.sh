@@ -331,7 +331,8 @@ shutdown_server() {
 backup_repository() {
 	DATABASE_DUMP_FILE="$REPOSITORY.sql"
 	echo_date "Creating SQL dump from contents of repository $REPOSITORY to $DATABASE_DUMP_FILE..."
-	mysqldump --user="${MYSQL_USER}" --password="${MYSQL_USER_PASSWORD}" --default-character-set=utf8 "${REPOSITORY}" --result-file="${TMP_DATASET_DIR}/${DATABASE_DUMP_FILE}" >/dev/null 2>&1
+	mysqldump --user="${MYSQL_USER}" --password="${MYSQL_USER_PASSWORD}" --default-character-set=utf8 "${REPOSITORY}" \
+		--quick --single-transaction --result-file="${TMP_DATASET_DIR}/${DATABASE_DUMP_FILE}" >/dev/null 2>&1
 }
 
 create_backup() {
@@ -385,7 +386,7 @@ update_dataset_sha1() {
 
 	if [ -f "${DEFAULT_DATASET_SHA1_LOCATION}" ]; then
 
-		INCOMING_DATASET_SHA1=$(sha1sum "${TARGET_ARCHIVE_PATH}" | sed -e 's/\s.*$//')
+		INCOMING_DATASET_SHA1=$(cat "${TARGET_ARCHIVE_PATH}.sha1" | sed -e 's/\s.*$//')
 		EXISTING_DATASET_SHA1=$(<${DEFAULT_DATASET_SHA1_LOCATION})
 
 		if [ ! -z "${EXISTING_DATASET_SHA1}" ]; then
