@@ -201,7 +201,7 @@ echo_error() {
 }
 
 echo_date() {
-	echo -e "[`date +\"%Y-%m-%d %H:%M:%S\"`] $@"
+	echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] $@"
 }
 
 echo_exit() {
@@ -362,7 +362,7 @@ find_running_snowowl_servers() {
 
 	echo_step "Searching for running server instances"
 
-	RUNNING_SERVER_PATH=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+	RUNNING_SERVER_PATH=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
 		echo_date "Found running Snow Owl server instance @ '${RUNNING_SERVER_PATH}'"
@@ -380,13 +380,23 @@ shutdown_server() {
 
 		echo_date "Shutting down server @ '${RUNNING_SERVER_PATH}'"
 
-		"${RUNNING_SERVER_PATH}/bin/shutdown.sh" >/dev/null
-
 		SERVER_IS_DOWN=false
+
+		if [ -f "${RUNNING_SERVER_PATH}/bin/shutdown.sh" ]; then
+
+			"${RUNNING_SERVER_PATH}/bin/shutdown.sh" >/dev/null
+
+		else
+
+			SERVER_PID=$(ps aux | grep java | grep osgi.install.area | awk '{print $2}')
+
+			kill ${SERVER_PID} >/dev/null
+
+		fi
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			SERVER_TO_SHUTDOWN=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+			SERVER_TO_SHUTDOWN=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 			if [ ! -z "${SERVER_TO_SHUTDOWN}" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
@@ -507,9 +517,11 @@ unzip_server() {
 
 	SERVER_RESOURCES_PATH="${SERVER_PATH}/resources"
 
-	if [ -d "${SERVER_RESOURCES_PATH}" ]; then
-		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}/"* && rm --recursive --force "${SERVER_RESOURCES_PATH}"
+	if [ ! -z "$(ls -A ${SERVER_RESOURCES_PATH})" ]; then
+		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}/"*
 	fi
+
+	rm --recursive --force "${SERVER_RESOURCES_PATH}"
 
 	ln -sf "${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}"
 	echo_date "Resources symlink points from '${SERVER_RESOURCES_PATH}' to '${GENERIC_RESOURCES_PATH}'"
@@ -725,7 +737,7 @@ verify_server_startup() {
 
 	for i in $(seq 1 "${RETRIES}"); do
 
-		SERVER_TO_START=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+		SERVER_TO_START=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 		if [ -z "${SERVER_TO_START}" ]; then
 			sleep "${RETRY_WAIT_SECONDS}"s
@@ -743,7 +755,7 @@ verify_server_startup() {
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			rest_call "$ADMIN_BASE_URL/info"
+			rest_call "${INFO_URL}"
 
 			if [ "${CURL_HTTP_STATUS}" != "200" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
