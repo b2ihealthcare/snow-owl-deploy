@@ -25,6 +25,8 @@
 # Determines where the server needs to be deployed, default is /opt/snowowl
 DEPLOYMENT_FOLDER="/opt/snowowl"
 
+JDK_HOME="/opt/jdk-11.0.4+11"
+
 # The server archive path that needs to be deployed
 SERVER_ARCHIVE_PATH=""
 
@@ -33,12 +35,6 @@ DATASET_ARCHIVE_PATH=""
 
 # The path to Snow Owl's config file to override the default
 SNOWOWL_CONFIG_PATH=""
-
-# MySQL user with database creation privileges
-MYSQL_USERNAME=""
-
-# Password for MySQL user with database creation privileges
-MYSQL_PASSWORD=""
 
 # Global path to server deployments
 GENERIC_SERVER_PATH=""
@@ -70,9 +66,6 @@ GENERIC_RESOURCES_PATH=""
 # The containing folder of the indexes within the provided dataset archive
 INDEXES_FOLDER_WITHIN_ARCHIVE=""
 
-# The containing folder of the SQL files within the provided dataset archive
-SQL_FOLDER_WITHIN_ARCHIVE=""
-
 # SHA1 checksum of the existing dataset
 EXISTING_DATASET_SHA1=""
 
@@ -94,26 +87,19 @@ RETRIES=300
 # The number of seconds to wait between retries
 RETRY_WAIT_SECONDS=1
 
-# The default MySQL username for the Snow Owl terminology server
-SNOWOWL_MYSQL_USERNAME=""
+# The username for the Snow Owl terminology server
+SNOWOWL_USERNAME=""
 
-# The default MySQL password for the Snow Owl terminology server
-SNOWOWL_MYSQL_PASSWORD=""
+# The user password for the Snow Owl terminology server
+SNOWOWL_USER_PASSWORD=""
 
 # The anchor file in a server archive which is always in the root of the server folder. This is
 # used for identifying the server folder inside an archive with subfolders.
-SERVER_ANCHOR_FILE="snowowl_config.yml"
+SERVER_ANCHOR_FILE="README.md"
 
 # The indexes anchor folder in a dataset archive.
 # This is used for identifying the index folder inside an archive with subfolders.
 INDEXES_ANCHOR="indexes"
-
-# The anchor file for SQL files.
-# This is used for identifying the folder which contains the SQL files inside an archive with subfolders.
-SQL_ANCHOR="snomedStore.sql"
-
-# The anchor for identifying the H2 store folder inside a datatset archive
-H2_ANCHOR="snomedStore.h2.db"
 
 # Path to the users file which contains file based authentication info
 AUTHENTICATION_FILE_PATH=""
@@ -129,13 +115,6 @@ INFO_URL="$ADMIN_BASE_URL/info"
 
 # The starting directory
 INITIAL_PWD="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Variable to determine the local MySQL instance
-MYSQL=$(which mysql)
-
-# List of all known database names used by the Snow Owl terminology server
-DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
-	loincStore mappingsetStore opcsStore sddStore snomedStore umlsStore valuesetStore)
 
 # Enviromental variable used by Jenkins
 export BUILD_ID=dontKillMe
@@ -162,14 +141,10 @@ OPTIONS:
 		Define the path to the snowowl_config.yml file which must be used for the deployment
 	-a path
 		Define the path to the file which contains users for file based authentication
-	-u username
-		Define a MySQL username with database creation privileges
-	-p password
-		Define the password for the above MySQL user
 	-f username
-		Define the MySQL user for the Snow Owl terminology server
+		Define the user for the Snow Owl terminology server
 	-j password
-		Define the password for the above Snow Owl MySQL user
+		Define the password for the above Snow Owl user
 
 NOTES:
 
@@ -179,13 +154,11 @@ NOTES:
 		- clean install of a server with a provided dataset
 		- upgrading to a newer server version without modifying the existing dataset
 		- upgrading to a newer version of dataset without modifying the currently running server
-		- updating MySQL content from a provided dataset
+		- updating the dataset using the provided archive
 
 	Mandatory variables:
-		- MySQL user with database creation privileges
-		- MySQL password for the above user
-		- MySQL user for the Snow Owl terminology server
-		- MySQL password for the above user
+		- user for the Snow Owl terminology server
+		- user password for the above user
 
 EOF
 
@@ -201,7 +174,7 @@ echo_error() {
 }
 
 echo_date() {
-	echo -e "[`date +\"%Y-%m-%d %H:%M:%S\"`] $@"
+	echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] $@"
 }
 
 echo_exit() {
@@ -225,22 +198,16 @@ check_if_file_exists() {
 
 }
 
-execute_mysql_statement() {
-	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" >/dev/null 2>&1 && echo_date "$2"
-}
-
 rest_call() {
-	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_MYSQL_USERNAME:$SNOWOWL_MYSQL_PASSWORD" --write-out "\n%{http_code}" "$@")
+	CURL_OUTPUT=$(curl -q --fail --silent --connect-timeout 5 --user "$SNOWOWL_USERNAME:$SNOWOWL_USER_PASSWORD" --write-out "\n%{http_code}" "$@")
 	CURL_MESSAGE=$(echo "$CURL_OUTPUT" | head -n-1)
 	CURL_HTTP_STATUS=$(echo "$CURL_OUTPUT" | tail -n1)
 }
 
 check_variables() {
 
-	check_if_empty "${MYSQL_USERNAME}" "MySQL username must be specified"
-	check_if_empty "${MYSQL_PASSWORD}" "MySQL password must be specified"
-	check_if_empty "${SNOWOWL_MYSQL_USERNAME}" "MySQL username for Snow Owl must be specified"
-	check_if_empty "${SNOWOWL_MYSQL_PASSWORD}" "MySQL password for Snow Owl must be specified"
+	check_if_empty "${SNOWOWL_USERNAME}" "Username for Snow Owl must be specified"
+	check_if_empty "${SNOWOWL_USER_PASSWORD}" "User password for Snow Owl must be specified"
 	check_if_empty "${DEPLOYMENT_FOLDER}" "Deployment folder must be specified"
 
 	if [ ! -z "${SERVER_ARCHIVE_PATH}" ]; then
@@ -322,36 +289,6 @@ scan_archives() {
 				echo_date "Found indexes folder in: '${DATASET_ARCHIVE_PATH}/${INDEXES_FOLDER_WITHIN_ARCHIVE}'"
 			fi
 
-			SQL_FOLDER_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep -i $SQL_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
-
-			if [ ! -z "${SQL_FOLDER_LOCATION}" ]; then
-
-				SQL_FOLDER_WITHIN_ARCHIVE=$(dirname "${SQL_FOLDER_LOCATION}")
-
-				if [ "${SQL_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
-					echo_date "Found SQL files in the root of '${DATASET_ARCHIVE_PATH}'"
-				else
-					echo_date "Found SQL files in: '${DATASET_ARCHIVE_PATH}/${SQL_FOLDER_WITHIN_ARCHIVE}'"
-				fi
-
-			else
-				echo_date "No SQL files found in the provided dataset archive"
-			fi
-
-			H2_STORE_LOCATION=$(unzip -l $DATASET_ARCHIVE_PATH | grep $H2_ANCHOR | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
-
-			if [ ! -z "${H2_STORE_LOCATION}" ]; then
-
-				H2_FOLDER_WITHIN_ARCHIVE=$(dirname "${H2_STORE_LOCATION}")
-
-				if [ "${H2_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
-					echo_date "Found H2 files in the root of '${DATASET_ARCHIVE_PATH}'"
-				else
-					echo_date "Found H2 files in: '${DATASET_ARCHIVE_PATH}/${H2_FOLDER_WITHIN_ARCHIVE}'"
-				fi
-
-			fi
-
 		fi
 
 	fi
@@ -362,7 +299,7 @@ find_running_snowowl_servers() {
 
 	echo_step "Searching for running server instances"
 
-	RUNNING_SERVER_PATH=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+	RUNNING_SERVER_PATH=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
 		echo_date "Found running Snow Owl server instance @ '${RUNNING_SERVER_PATH}'"
@@ -380,13 +317,23 @@ shutdown_server() {
 
 		echo_date "Shutting down server @ '${RUNNING_SERVER_PATH}'"
 
-		"${RUNNING_SERVER_PATH}/bin/shutdown.sh" >/dev/null
-
 		SERVER_IS_DOWN=false
+
+		if [ -f "${RUNNING_SERVER_PATH}/bin/shutdown.sh" ]; then
+
+			"${RUNNING_SERVER_PATH}/bin/shutdown.sh" >/dev/null
+
+		else
+
+			SERVER_PID=$(ps aux | grep java | grep osgi.install.area | awk '{print $2}')
+
+			kill ${SERVER_PID} >/dev/null
+
+		fi
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			SERVER_TO_SHUTDOWN=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+			SERVER_TO_SHUTDOWN=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 			if [ ! -z "${SERVER_TO_SHUTDOWN}" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
@@ -507,9 +454,11 @@ unzip_server() {
 
 	SERVER_RESOURCES_PATH="${SERVER_PATH}/resources"
 
-	if [ -d "${SERVER_RESOURCES_PATH}" ]; then
-		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}/"* && rm --recursive --force "${SERVER_RESOURCES_PATH}"
+	if [ ! -z "$(ls -A ${SERVER_RESOURCES_PATH})" ]; then
+		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}/"*
 	fi
+
+	rm --recursive --force "${SERVER_RESOURCES_PATH}"
 
 	ln -sf "${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}"
 	echo_date "Resources symlink points from '${SERVER_RESOURCES_PATH}' to '${GENERIC_RESOURCES_PATH}'"
@@ -563,68 +512,6 @@ check_dataset_sha() {
 	fi
 }
 
-setup_mysql_content() {
-
-	echo_step "Setting up MySQL content..."
-
-	SNOWOWL_USER_EXISTS=false
-
-	while read USER; do
-		if [[ "${SNOWOWL_MYSQL_USERNAME}" == "${USER}" ]]; then
-			SNOWOWL_USER_EXISTS=true
-			break
-		fi
-	done < <(${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} \
-		--batch --skip-column-names --execute='use mysql; SELECT `user` FROM `user`;' >/dev/null 2>&1)
-
-	if [ "$SNOWOWL_USER_EXISTS" = false ]; then
-		execute_mysql_statement "CREATE USER '${SNOWOWL_MYSQL_USERNAME}'@'localhost' identified by '${SNOWOWL_MYSQL_PASSWORD}';" \
-			"Created '${SNOWOWL_MYSQL_USERNAME}' MySQL user with password '${SNOWOWL_MYSQL_PASSWORD}'."
-	fi
-
-	for i in "${DATABASES[@]}"; do
-		execute_mysql_statement "DROP DATABASE \`${i}\`;" "Dropped database ${i}."
-	done
-
-	EXISTING_SQL_FILES=$(find "${GENERIC_RESOURCES_PATH}" -type f -name '*.sql')
-
-	if [ ! -n "${EXISTING_SQL_FILES}" ]; then
-
-		echo_date "Creating empty databases..."
-
-		for i in "${DATABASES[@]}"; do
-
-			DATABASE_NAME=${i}
-
-			execute_mysql_statement "CREATE DATABASE \`${DATABASE_NAME}\` DEFAULT CHARSET 'utf8';" "Created database ${DATABASE_NAME}."
-			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'localhost';" \
-				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@localhost'."
-
-		done
-
-	else
-
-		for i in ${EXISTING_SQL_FILES}; do
-
-			BASENAME=$(basename ${i})
-			DATABASE_NAME=${BASENAME%.sql}
-
-			execute_mysql_statement "CREATE DATABASE \`${DATABASE_NAME}\` DEFAULT CHARSET 'utf8';" "Created database ${DATABASE_NAME}."
-			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'localhost';" \
-				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@localhost'."
-
-			echo_date "Loading ${BASENAME}..."
-			${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} "${DATABASE_NAME}" <"${i}" >/dev/null 2>&1 &&
-				echo_date "Loading of ${BASENAME} finished."
-
-		done
-
-	fi
-
-	execute_mysql_statement "FLUSH PRIVILEGES;" "Reloaded grant tables."
-
-}
-
 unzip_and_load_dataset() {
 
 	echo_step "Unzipping dataset"
@@ -653,41 +540,6 @@ unzip_and_load_dataset() {
 
 	fi
 
-	if [ ! -z "${SQL_FOLDER_WITHIN_ARCHIVE}" ]; then
-
-		if [ "${SQL_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
-			unzip -q "${DATASET_ARCHIVE_PATH}" "*.sql" -d "${TMP_DATASET_DIR}"
-			mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/"*.sql
-		else
-			unzip -q "${DATASET_ARCHIVE_PATH}" "${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql -d "${TMP_DATASET_DIR}"
-			mv -t "${GENERIC_RESOURCES_PATH}" "${TMP_DATASET_DIR}/${SQL_FOLDER_WITHIN_ARCHIVE}/"*.sql
-		fi
-
-		echo_date "Extracted SQL files to: '${GENERIC_RESOURCES_PATH}'"
-
-	fi
-
-	if [ ! -z "${H2_FOLDER_WITHIN_ARCHIVE}" ]; then
-
-		mkdir "${GENERIC_RESOURCES_PATH}/store"
-
-		if [ "${H2_FOLDER_WITHIN_ARCHIVE}" = "." ]; then
-			unzip -q "${DATASET_ARCHIVE_PATH}" "*.db" -d "${TMP_DATASET_DIR}"
-			mv -t "${GENERIC_RESOURCES_PATH}/store" "${TMP_DATASET_DIR}/"*.db
-		else
-			unzip -q "${DATASET_ARCHIVE_PATH}" "${H2_FOLDER_WITHIN_ARCHIVE}/"*.db -d "${TMP_DATASET_DIR}"
-			mv -t "${GENERIC_RESOURCES_PATH}/store" "${TMP_DATASET_DIR}/${H2_FOLDER_WITHIN_ARCHIVE}/"*.db
-		fi
-
-		echo_date "Extracted H2 database files to: '${GENERIC_RESOURCES_PATH}/store'"
-
-	else
-
-		# load MySQL content only when there is no H2 database in the dataset archive
-		setup_mysql_content
-
-	fi
-
 }
 
 setup_configuration() {
@@ -700,10 +552,10 @@ setup_configuration() {
 
 			\cp --force --target-directory="${DEPLOYMENT_FOLDER}" "${SNOWOWL_CONFIG_PATH}"
 
-			rm --force "$SERVER_PATH/snowowl_config.yml"
+			rm --force "$SERVER_PATH/configuration/snowowl.yml"
 
-			ln -sf "${DEPLOYMENT_FOLDER}/snowowl_config.yml" "${SERVER_PATH}/snowowl_config.yml"
-			echo_date "Snow Owl's config symlink points from '${SERVER_PATH}/snowowl_config.yml' to '${DEPLOYMENT_FOLDER}/config.yml'"
+			ln -sf "${DEPLOYMENT_FOLDER}/snowowl.yml" "${SERVER_PATH}/configuration/snowowl.yml"
+			echo_date "Snow Owl's config symlink points from '${SERVER_PATH}/configuration/snowowl.yml' to '${DEPLOYMENT_FOLDER}/snowowl.yml'"
 
 		fi
 
@@ -725,7 +577,7 @@ verify_server_startup() {
 
 	for i in $(seq 1 "${RETRIES}"); do
 
-		SERVER_TO_START=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+		SERVER_TO_START=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 		if [ -z "${SERVER_TO_START}" ]; then
 			sleep "${RETRY_WAIT_SECONDS}"s
@@ -743,7 +595,7 @@ verify_server_startup() {
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			rest_call "$ADMIN_BASE_URL/info"
+			rest_call "${INFO_URL}"
 
 			if [ "${CURL_HTTP_STATUS}" != "200" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
@@ -779,7 +631,9 @@ start_server() {
 
 		chmod +x $SERVER_PATH/bin/*.sh
 
-		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${SERVER_PATH}/bin/startup.sh"
+		export JAVA_HOME="${JDK_HOME}"
+
+		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${SERVER_PATH}/bin/snowowl.sh"
 
 		verify_server_startup "${SERVER_PATH}"
 
@@ -837,7 +691,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":hx:s:d:r:c:a:u:p:f:j:" opt; do
+while getopts ":hx:s:d:r:c:a:f:j:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -861,17 +715,11 @@ while getopts ":hx:s:d:r:c:a:u:p:f:j:" opt; do
 	a)
 		AUTHENTICATION_FILE_PATH=$OPTARG
 		;;
-	u)
-		MYSQL_USERNAME=$OPTARG
-		;;
-	p)
-		MYSQL_PASSWORD=$OPTARG
-		;;
 	f)
-		SNOWOWL_MYSQL_USERNAME=$OPTARG
+		SNOWOWL_USERNAME=$OPTARG
 		;;
 	j)
-		SNOWOWL_MYSQL_PASSWORD=$OPTARG
+		SNOWOWL_USER_PASSWORD=$OPTARG
 		;;
 	\?)
 		echo_error "Invalid option: $OPTARG" >&2
