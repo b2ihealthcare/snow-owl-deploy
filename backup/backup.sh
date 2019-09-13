@@ -25,6 +25,8 @@
 # The default deployment folder for Snow Owl terminology servers
 DEFAULT_DEPLOYMENT_FOLDER="/opt/snowowl"
 
+JDK_HOME="/opt/jdk-11.0.4+11"
+
 # The default location where dataset SHA1 sum is stored
 DEFAULT_DATASET_SHA1_LOCATION="${DEFAULT_DEPLOYMENT_FOLDER}/currentDataset"
 
@@ -33,15 +35,6 @@ DEFAULT_SERVER_PATH="${DEFAULT_DEPLOYMENT_FOLDER}/server/latest"
 
 # The target path of the dataset backup archive
 TARGET_ARCHIVE_PATH=""
-
-# The type of database which requires a backup, either 'mysql' or 'h2'
-DATABASE_TYPE=""
-
-# MySQL user
-MYSQL_USER=""
-
-# Password for MySQL user
-MYSQL_USER_PASSWORD=""
 
 # Existing username for the Snow Owl terminology server
 SNOWOWL_USER=""
@@ -73,11 +66,6 @@ REPOSITORIES_URL="${ADMIN_BASE_URL}/repositories"
 # The general info REST endpoint which also provides the list of available repositories
 INFO_URL="${ADMIN_BASE_URL}/info"
 
-# List of all known database names used by the Snow Owl terminology server
-# This is used only as a fallback
-REPOSITORIES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
-	loincStore mappingsetStore opcsStore sddStore snomedStore umlsStore valuesetStore)
-
 # Enviromental variable used by Jenkins
 export BUILD_ID=dontKillMe
 
@@ -93,12 +81,6 @@ OPTIONS:
 		Show this help
 	-t path
 		Define the target path of the backup archive including the desired filename
-	-d type
-		Define the database type of the given Snow Owl terminology server. It has to be either 'mysql' or 'h2'
-	-u username
-		Define a MySQL username which will be used for accessing the database
-	-p password
-		Define the password for the above MySQL user
 	-f username
 		Define the user for the Snow Owl terminology server which will be used for accessing information through the REST API
 	-j password
@@ -113,22 +95,22 @@ NOTES:
 	If there is a running Snow Owl terminology server at the time of script execution, the following will happen:
 		- automatically locate the server
 		- shut it down gracefully
-		- create backup archive (including MySQL dumps in case of 'mysql')
+		- create backup archive
 		- update dataset SHA1 file if required
 		- restart server and wait for full initialization
 
 	If there are no Snow Owl servers running at the time of script execution, the following will happen:
 		- use the configured default server path to locate the Snow Owl terminology server (E.g.: /opt/snowowl/server/latest )
-		- create backup archive (including MySQL dumps in case of 'mysql')
+		- create backup archive
 		- update dataset SHA1 file if required
 
 	Examples:
 
-	./backup.sh -t /path/to/desired/backup_archive.zip -d mysql -u username -p password -f username2 -j password2
+	./backup.sh -t /path/to/desired/backup_archive.zip -f username -j password
 
 	OR
 
-	./backup.sh -t /path/to/desired/backup_archive.zip -d h2 -u username -p password -f username2 -j password2 -r true
+	./backup.sh -t /path/to/desired/backup_archive.zip -f username -j password -r true
 
 EOF
 }
@@ -143,7 +125,7 @@ echo_error() {
 }
 
 echo_date() {
-	echo -e "[`date +\"%Y-%m-%d %H:%M:%S\"`] $@"
+	echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] $@"
 }
 
 echo_exit() {
@@ -175,18 +157,11 @@ rest_call() {
 
 check_variables() {
 
-	check_if_empty "${MYSQL_USER}" "MySQL username must be specified"
-	check_if_empty "${MYSQL_USER_PASSWORD}" "MySQL password must be specified"
 	check_if_empty "${SNOWOWL_USER}" "A valid username for Snow Owl must be specified"
 	check_if_empty "${SNOWOWL_USER_PASSWORD}" "Password for the Snow Owl user must be specified"
 
 	check_if_empty "${TARGET_ARCHIVE_PATH}" "A target path must be specified for the backup archive"
 	check_if_folder_exists $(dirname ${TARGET_ARCHIVE_PATH}) "Target directory of the backup archive must exist"
-
-	check_if_empty "${DATABASE_TYPE}" "The type of backup must be specified (mysql or h2)"
-	if [ "${DATABASE_TYPE}" != "mysql" ] && [ "${DATABASE_TYPE}" != "h2" ]; then
-		echo_exit "Unknown database type: ${DATABASE_TYPE}. Please use either 'mysql' or 'h2'"
-	fi
 
 }
 
@@ -194,7 +169,7 @@ find_running_snowowl_servers() {
 
 	echo_step "Searching for running server instances"
 
-	RUNNING_SERVER_PATH=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+	RUNNING_SERVER_PATH=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
 		echo_date "The following Snow Owl server will be used for the backup: '${RUNNING_SERVER_PATH}'"
@@ -206,94 +181,6 @@ find_running_snowowl_servers() {
 
 }
 
-collect_repositories() {
-
-	COLLECTED_REPOSITORIES=()
-
-	while read -r REPOSITORY; do
-		COLLECTED_REPOSITORIES=("${COLLECTED_REPOSITORIES[@]}" "${REPOSITORY}")
-	done < <(echo "${CURL_MESSAGE}" | grep -Po '"id":.*?[^\\]",' | sed 's/\"id\":\"\(.*\)\",/\1/')
-
-	if [ ${#COLLECTED_REPOSITORIES[@]} -eq 0 ]; then
-		echo_date "Failed to collect available repositories through REST, the default set of repositories will be used"
-	else
-		REPOSITORIES=("${COLLECTED_REPOSITORIES[@]}")
-	fi
-
-	for REPOSITORY in "${REPOSITORIES[@]}"; do
-		echo_date "Identified repository: '${REPOSITORY}'"
-	done
-
-}
-
-configure_repositories() {
-
-	echo_step "Collecting available repositories"
-
-	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
-
-		EXTRACTED_REPOSITORIES=false
-
-		for i in $(seq 1 "${RETRIES}"); do
-
-			rest_call "${REPOSITORIES_URL}"
-
-			if [ "${CURL_HTTP_STATUS}" != "200" ]; then
-				sleep "${RETRY_WAIT_SECONDS}"s
-			else
-
-				if [ -z "${CURL_MESSAGE}" ] || [ "${CURL_MESSAGE}" = "{}" ]; then
-					break # try other endpoint
-				fi
-
-				collect_repositories
-
-				EXTRACTED_REPOSITORIES=true
-				break
-
-			fi
-
-		done
-
-		if [ "${EXTRACTED_REPOSITORIES}" = false ]; then
-
-			for i in $(seq 1 "${RETRIES}"); do
-
-				rest_call "${INFO_URL}"
-
-				if [ "${CURL_HTTP_STATUS}" != "200" ]; then
-					sleep "${RETRY_WAIT_SECONDS}"s
-				else
-
-					if [ -z "${CURL_MESSAGE}" ] || [ "${CURL_MESSAGE}" = "{}" ]; then
-						break # fall back to defaults
-					fi
-
-					collect_repositories
-
-					EXTRACTED_REPOSITORIES=true
-					break
-
-				fi
-
-			done
-
-		fi
-
-		if [ "${EXTRACTED_REPOSITORIES}" = false ]; then
-			echo_date "Failed to collect available repositories through REST, the default set of repositories will be used"
-		fi
-
-	else
-
-		echo_date "There were no running Snow Owl servers, the default set of repositories will be used"
-
-	fi
-
-	echo_date "Repositories to dump: '${REPOSITORIES[@]}'"
-
-}
-
 shutdown_server() {
 
 	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
@@ -302,13 +189,23 @@ shutdown_server() {
 
 		echo_date "Shutting down server @ '${RUNNING_SERVER_PATH}'"
 
-		"${RUNNING_SERVER_PATH}/bin/shutdown.sh" >/dev/null
-
 		SERVER_IS_DOWN=false
+
+		if [ -f "${RUNNING_SERVER_PATH}/bin/shutdown.sh" ]; then
+
+			"${RUNNING_SERVER_PATH}/bin/shutdown.sh" >/dev/null
+
+		else
+
+			SERVER_PID=$(ps aux | grep java | grep osgi.install.area | awk '{print $2}')
+
+			kill ${SERVER_PID} >/dev/null
+
+		fi
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			SERVER_TO_SHUTDOWN=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+			SERVER_TO_SHUTDOWN=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 			if [ ! -z "${SERVER_TO_SHUTDOWN}" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
@@ -328,53 +225,21 @@ shutdown_server() {
 
 }
 
-backup_repository() {
-	DATABASE_DUMP_FILE="$REPOSITORY.sql"
-	echo_date "Creating SQL dump from contents of repository $REPOSITORY to $DATABASE_DUMP_FILE..."
-	mysqldump --user="${MYSQL_USER}" --password="${MYSQL_USER_PASSWORD}" --default-character-set=utf8 "${REPOSITORY}" \
-		--quick --single-transaction --result-file="${TMP_DATASET_DIR}/${DATABASE_DUMP_FILE}" >/dev/null 2>&1
-}
-
 create_backup() {
 
 	echo_step "Creating backup"
 
 	TMP_DATASET_DIR=$(mktemp -d --tmpdir="${SERVER_PATH}")
 
-	if [ "${DATABASE_TYPE}" = "mysql" ]; then
+	ln -s "${SERVER_PATH}/resources/indexes" "${TMP_DATASET_DIR}/indexes"
 
-		echo_date "Initiating backup for database type: '${DATABASE_TYPE}'"
+	cd "${TMP_DATASET_DIR}"
 
-		for REPOSITORY in "${REPOSITORIES[@]}"; do
-			backup_repository
-		done
+	echo_date "Creating archive @ '${TARGET_ARCHIVE_PATH}'"
 
-		ln -s "${SERVER_PATH}/resources/indexes" "${TMP_DATASET_DIR}/indexes"
-
-		cd "${TMP_DATASET_DIR}"
-
-		echo_date "Creating archive @ '${TARGET_ARCHIVE_PATH}'"
-
-		zip --recurse-paths --quiet --display-globaldots --dot-size 500m "${TARGET_ARCHIVE_PATH}" "indexes"/ *.sql &&
-			echo_date "Archive is available @ '${TARGET_ARCHIVE_PATH}'" ||
-			echo_date "Archive creation failed @ '${TARGET_ARCHIVE_PATH}'"
-
-	else # h2
-
-		echo_date "Initiating backup for database type: '${DATABASE_TYPE}'"
-
-		ln -s "${SERVER_PATH}/resources/indexes" "${TMP_DATASET_DIR}/indexes"
-		ln -s "${SERVER_PATH}/resources/store" "${TMP_DATASET_DIR}/store"
-
-		cd "${TMP_DATASET_DIR}"
-
-		echo_date "Creating archive @ '${TARGET_ARCHIVE_PATH}'"
-
-		zip --recurse-paths --quiet --display-globaldots --dot-size 500m "${TARGET_ARCHIVE_PATH}" "indexes"/ "store"/ &&
-			echo_date "Archive is available @ '${TARGET_ARCHIVE_PATH}'" ||
-			echo_date "Archive creation failed @ '${TARGET_ARCHIVE_PATH}'"
-
-	fi
+	zip --recurse-paths --quiet --display-globaldots --dot-size 500m "${TARGET_ARCHIVE_PATH}" "indexes"/ &&
+		echo_date "Archive is available @ '${TARGET_ARCHIVE_PATH}'" ||
+		echo_date "Archive creation failed @ '${TARGET_ARCHIVE_PATH}'"
 
 	if [ -f "${TARGET_ARCHIVE_PATH}" ]; then
 		sha1sum "${TARGET_ARCHIVE_PATH}" >"${TARGET_ARCHIVE_PATH}.sha1" && echo_date "SHA1 checksum is @ '${TARGET_ARCHIVE_PATH}.sha1'"
@@ -419,7 +284,7 @@ verify_server_startup() {
 
 	for i in $(seq 1 "${RETRIES}"); do
 
-		SERVER_TO_START=$(ps aux | grep virgo | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
+		SERVER_TO_START=$(ps aux | grep java | sed 's/-D/\n/g' | grep osgi.install.area | sed 's/=/\n/g' | tail -n1 | sed 's/ //g')
 
 		if [ -z "${SERVER_TO_START}" ]; then
 			sleep "${RETRY_WAIT_SECONDS}"s
@@ -437,7 +302,7 @@ verify_server_startup() {
 
 		for i in $(seq 1 "${RETRIES}"); do
 
-			rest_call "$ADMIN_BASE_URL/info"
+			rest_call "${INFO_URL}"
 
 			if [ "${CURL_HTTP_STATUS}" != "200" ]; then
 				sleep "${RETRY_WAIT_SECONDS}"s
@@ -465,7 +330,7 @@ verify_server_startup() {
 
 }
 
-restart_server() {
+start_server() {
 
 	if [ ! -z "${SERVER_PATH}" ]; then
 
@@ -473,7 +338,9 @@ restart_server() {
 
 		chmod +x $SERVER_PATH/bin/*.sh
 
-		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${SERVER_PATH}/bin/startup.sh"
+		export JAVA_HOME="${JDK_HOME}"
+
+		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${SERVER_PATH}/bin/snowowl.sh"
 
 		verify_server_startup "${SERVER_PATH}"
 
@@ -490,10 +357,6 @@ cleanup() {
 			rm --force "${TMP_DATASET_DIR}/indexes" && echo_date "Removed symlink to 'indexes' folder"
 		fi
 
-		if [ -d "${TMP_DATASET_DIR}/store" ]; then
-			rm --force "${TMP_DATASET_DIR}/store" && echo_date "Removed symlink to 'store' folder"
-		fi
-
 		rm --recursive --force ${TMP_DATASET_DIR} && echo_date "Deleted temporary backup dir @ '${TMP_DATASET_DIR}'"
 
 	fi
@@ -508,10 +371,6 @@ main() {
 
 	find_running_snowowl_servers
 
-	if [ "${DATABASE_TYPE}" = "mysql" ]; then
-		configure_repositories
-	fi
-
 	shutdown_server
 
 	create_backup
@@ -521,7 +380,7 @@ main() {
 	fi
 
 	if [ ! -z "${RUNNING_SERVER_PATH}" ]; then
-		restart_server
+		start_server
 	fi
 
 	echo_date
@@ -533,7 +392,7 @@ main() {
 
 trap cleanup EXIT
 
-while getopts ":ht:d:u:p:f:j:r:" opt; do
+while getopts ":ht:f:j:r:" opt; do
 	case "$opt" in
 	h)
 		usage
@@ -541,15 +400,6 @@ while getopts ":ht:d:u:p:f:j:r:" opt; do
 		;;
 	t)
 		TARGET_ARCHIVE_PATH=$OPTARG
-		;;
-	d)
-		DATABASE_TYPE=$OPTARG
-		;;
-	u)
-		MYSQL_USER=$OPTARG
-		;;
-	p)
-		MYSQL_USER_PASSWORD=$OPTARG
 		;;
 	f)
 		SNOWOWL_USER=$OPTARG

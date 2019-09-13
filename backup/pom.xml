@@ -10,9 +10,6 @@
 	
 	<properties>
 		<target.path></target.path>
-		<database.type></database.type>
-		<mysql.user></mysql.user>
-		<mysql.pass></mysql.pass>
 		<snowowl.user></snowowl.user>
 		<snowowl.pass></snowowl.pass>
 		<refresh.sha1></refresh.sha1>
@@ -55,12 +52,6 @@
 							<arguments>
 								<argument>-t</argument>
 								<argument>${target.path}</argument>
-								<argument>-d</argument>
-								<argument>${database.type}</argument>
-								<argument>-u</argument>
-								<argument>${mysql.user}</argument>
-								<argument>-p</argument>
-								<argument>${mysql.pass}</argument>
 								<argument>-f</argument>
 								<argument>${snowowl.user}</argument>
 								<argument>-j</argument>
