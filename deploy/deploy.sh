@@ -454,10 +454,6 @@ unzip_server() {
 
 	SERVER_RESOURCES_PATH="${SERVER_PATH}/resources"
 
-	if [ ! -z "$(ls -A ${SERVER_RESOURCES_PATH})" ]; then
-		\cp --recursive --force --target-directory="${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}/"*
-	fi
-
 	rm --recursive --force "${SERVER_RESOURCES_PATH}"
 
 	ln -sf "${GENERIC_RESOURCES_PATH}" "${SERVER_RESOURCES_PATH}"
