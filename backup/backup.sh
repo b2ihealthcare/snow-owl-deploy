@@ -143,7 +143,7 @@ echo_error() {
 }
 
 echo_date() {
-	echo -e "[`date +\"%Y-%m-%d %H:%M:%S\"`] $@"
+	echo -e "[$(date +"%Y-%m-%d %H:%M:%S")] $@"
 }
 
 echo_exit() {
@@ -473,7 +473,17 @@ restart_server() {
 
 		chmod +x $SERVER_PATH/bin/*.sh
 
-		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${SERVER_PATH}/bin/startup.sh"
+		START_SCRIPT="${SERVER_PATH}/bin/startup.sh"
+
+		if [ -f "${SERVER_PATH}/bin/startup.sh" ]; then
+			START_SCRIPT="${SERVER_PATH}/bin/startup.sh"
+		elif [ -f "${SERVER_PATH}/bin/cis.sh" ]; then
+			START_SCRIPT="${SERVER_PATH}/bin/cis.sh"
+		elif [ -f "${SERVER_PATH}/bin/snowowl.sh" ]; then
+			START_SCRIPT="${SERVER_PATH}/bin/snowowl.sh"
+		fi
+
+		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${START_SCRIPT}"
 
 		verify_server_startup "${SERVER_PATH}"
 
