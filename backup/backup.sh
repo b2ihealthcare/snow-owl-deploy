@@ -76,7 +76,7 @@ INFO_URL="${ADMIN_BASE_URL}/info"
 # List of all known database names used by the Snow Owl terminology server
 # This is used only as a fallback
 REPOSITORIES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
-	loincStore mappingsetStore opcsStore sddStore snomedStore umlsStore valuesetStore)
+	loincStore mappingsetStore nicipStore opcsStore sddStore snomedStore umlsStore valuesetStore)
 
 # Enviromental variable used by Jenkins
 export BUILD_ID=dontKillMe

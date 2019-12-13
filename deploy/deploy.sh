@@ -135,7 +135,7 @@ MYSQL=$(which mysql)
 
 # List of all known database names used by the Snow Owl terminology server
 DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
-	loincStore mappingsetStore opcsStore sddStore snomedStore umlsStore valuesetStore)
+	loincStore mappingsetStore nicipStore opcsStore sddStore snomedStore umlsStore valuesetStore)
 
 # Enviromental variable used by Jenkins
 export BUILD_ID=dontKillMe
