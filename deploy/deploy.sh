@@ -95,7 +95,7 @@ SNOWOWL_USER_PASSWORD=""
 
 # The anchor file in a server archive which is always in the root of the server folder. This is
 # used for identifying the server folder inside an archive with subfolders.
-SERVER_ANCHOR_FILE="README.md"
+SERVER_ANCHOR_FILE="plugins"
 
 # The indexes anchor folder in a dataset archive.
 # This is used for identifying the index folder inside an archive with subfolders.
@@ -260,7 +260,7 @@ scan_archives() {
 
 	if [ ! -z "${SERVER_ARCHIVE_PATH}" ]; then
 
-		CONFIG_LOCATION=$(unzip -l $SERVER_ARCHIVE_PATH | grep $SERVER_ANCHOR_FILE | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
+		CONFIG_LOCATION=$(unzip -l $SERVER_ARCHIVE_PATH | grep $SERVER_ANCHOR_FILE/$ | sed 's/ /\n/g' | tail -n1 | sed 's/ //g')
 
 		if [ -z "${CONFIG_LOCATION}" ]; then
 			echo_exit "Unable to locate Snow Owl server within '${SERVER_ARCHIVE_PATH}'"
