@@ -627,7 +627,9 @@ start_server() {
 
 		chmod +x $SERVER_PATH/bin/*.sh
 
-		export JAVA_HOME="${JDK_HOME}"
+		sed -i "s|-Xms6g|-Xms20g|g" $SERVER_PATH/bin/snowowl.sh
+		sed -i "s|-Xmx6g|-Xmx20g|g" $SERVER_PATH/bin/snowowl.sh
+		sed -i "s|\$JAVA_EXECUTABLE|${JDK_HOME}/bin/java|g" $SERVER_PATH/bin/snowowl.sh
 
 		screen -d -m -S "$(basename ${SERVER_PATH})" -t "${SERVER_PATH}" "${SERVER_PATH}/bin/snowowl.sh"
 
