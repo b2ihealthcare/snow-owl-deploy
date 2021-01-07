@@ -226,7 +226,7 @@ check_if_file_exists() {
 }
 
 execute_mysql_statement() {
-	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" >/dev/null 2>&1 && echo_date "$2"
+	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" # >/dev/null 2>&1 && echo_date "$2"
 }
 
 rest_call() {
