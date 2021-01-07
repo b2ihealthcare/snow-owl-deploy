@@ -23,6 +23,7 @@
 		<mysql.pass></mysql.pass>
 		<snowowl.mysql.user></snowowl.mysql.user>
 		<snowowl.mysql.pass></snowowl.mysql.pass>
+		<snowowl.host></snowowl.host>
 	</properties>
 	
 	<build>
@@ -80,6 +81,8 @@
 								<argument>${snowowl.mysql.user}</argument>
 								<argument>-j</argument>
 								<argument>${snowowl.mysql.pass}</argument>
+								<argument>-w</argument>
+								<argument>${snowowl.host}</argument>
 							</arguments>
 						</configuration>
 					</execution>
