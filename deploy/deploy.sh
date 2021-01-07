@@ -137,6 +137,9 @@ MYSQL=$(which mysql)
 DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
 	loincStore mappingsetStore nicipStore opcsStore sddStore snomedStore umlsStore valuesetStore)
 
+# The hostname of the server running Snow Owl, used for MySQL access control
+SNOWOWL_HOST="localhost"
+
 # Enviromental variable used by Jenkins
 export BUILD_ID=dontKillMe
 
@@ -170,6 +173,8 @@ OPTIONS:
 		Define the MySQL user for the Snow Owl terminology server
 	-j password
 		Define the password for the above Snow Owl MySQL user
+	-w hostname
+		Define the host which will be allowed access, for the above Snow Owl MySQL user
 
 NOTES:
 
@@ -226,7 +231,7 @@ check_if_file_exists() {
 }
 
 execute_mysql_statement() {
-	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" # >/dev/null 2>&1 && echo_date "$2"
+	${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} --execute="$1" >/dev/null 2>&1 && echo_date "$2"
 }
 
 rest_call() {
@@ -590,7 +595,7 @@ setup_mysql_content() {
 		--batch --skip-column-names --execute='use mysql; SELECT `user` FROM `user`;' >/dev/null 2>&1)
 
 	if [ "$SNOWOWL_USER_EXISTS" = false ]; then
-		execute_mysql_statement "CREATE USER '${SNOWOWL_MYSQL_USERNAME}'@'localhost' identified by '${SNOWOWL_MYSQL_PASSWORD}';" \
+		execute_mysql_statement "CREATE USER '${SNOWOWL_MYSQL_USERNAME}'@'${SNOWOWL_HOST}' identified by '${SNOWOWL_MYSQL_PASSWORD}';" \
 			"Created '${SNOWOWL_MYSQL_USERNAME}' MySQL user with password '${SNOWOWL_MYSQL_PASSWORD}'."
 	fi
 
@@ -609,8 +614,8 @@ setup_mysql_content() {
 			DATABASE_NAME=${i}
 
 			execute_mysql_statement "CREATE DATABASE \`${DATABASE_NAME}\` DEFAULT CHARSET 'utf8';" "Created database ${DATABASE_NAME}."
-			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'localhost';" \
-				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@localhost'."
+			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'${SNOWOWL_HOST}';" \
+				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@${SNOWOWL_HOST}'."
 
 		done
 
@@ -622,8 +627,8 @@ setup_mysql_content() {
 			DATABASE_NAME=${BASENAME%.sql}
 
 			execute_mysql_statement "CREATE DATABASE \`${DATABASE_NAME}\` DEFAULT CHARSET 'utf8';" "Created database ${DATABASE_NAME}."
-			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'localhost';" \
-				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@localhost'."
+			execute_mysql_statement "GRANT ALL PRIVILEGES ON \`${DATABASE_NAME}\`.* to '${SNOWOWL_MYSQL_USERNAME}'@'${SNOWOWL_HOST}';" \
+				"Granted all privileges on ${DATABASE_NAME} to '${SNOWOWL_MYSQL_USERNAME}@${SNOWOWL_HOST}'."
 
 			echo_date "Loading ${BASENAME}..."
 			${MYSQL} --user=${MYSQL_USERNAME} --password=${MYSQL_PASSWORD} "${DATABASE_NAME}" <"${i}" >/dev/null 2>&1 &&
@@ -894,6 +899,9 @@ while getopts ":hx:s:d:r:c:a:u:p:f:j:" opt; do
 		;;
 	j)
 		SNOWOWL_MYSQL_PASSWORD=$OPTARG
+		;;
+	w)
+		SNOWOWL_HOST=$OPTARG
 		;;
 	\?)
 		echo_error "Invalid option: $OPTARG" >&2
