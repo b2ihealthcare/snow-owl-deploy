@@ -141,7 +141,10 @@ DATABASES=(atcStore icd10Store icd10amStore icd10cmStore icd10ukStore lcsStore
 SNOWOWL_HOST="localhost"
 
 # Enviromental variable used by Jenkins
+
 export BUILD_ID=dontKillMe
+
+export JAVA_HOME=/opt/jdk-8
 
 usage() {
 
